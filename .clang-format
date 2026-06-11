@@ -1,0 +1,37 @@
+Language: Cpp
+BasedOnStyle: Google
+Standard: Latest
+ColumnLimit: 120
+IndentWidth: 2
+AccessModifierOffset: -1
+LineEnding: LF
+InsertNewlineAtEOF: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortLambdasOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+AllowAllArgumentsOnNextLine: true
+BinPackArguments: false
+BinPackParameters: false
+BreakBeforeConceptDeclarations: Always
+RequiresClausePosition: OwnLine
+RequiresExpressionIndentation: OuterScope
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Attach
+DerivePointerAlignment: false
+PointerAlignment: Left
+ReflowComments: false
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<gmock/|^<gtest/'
+    Priority: 1
+  - Regex: '^<chaistl/'
+    Priority: 2
+  - Regex: '^<[^>]+>'
+    Priority: 3
+  - Regex: '^"'
+    Priority: 4
+SpacesInAngles: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false

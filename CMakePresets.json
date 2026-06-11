@@ -1,0 +1,281 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "clang-debug",
+      "displayName": "Clang Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "clang++-22"
+      }
+    },
+    {
+      "name": "clang-cxx26-debug",
+      "displayName": "Clang C++26 Debug",
+      "inherits": "clang-debug",
+      "binaryDir": "${sourceDir}/build/clang-cxx26-debug",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_CXX26": "ON"
+      }
+    },
+    {
+      "name": "clang-coverage",
+      "displayName": "Clang Coverage",
+      "inherits": "clang-debug",
+      "binaryDir": "${sourceDir}/build/clang-coverage",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "clang-benchmark",
+      "displayName": "Clang Benchmark",
+      "inherits": "clang-debug",
+      "binaryDir": "${sourceDir}/build/clang-benchmark",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CHAISTL_BUILD_TESTS": "OFF",
+        "CHAISTL_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "gcc-debug",
+      "displayName": "GCC Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gcc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "g++-14"
+      }
+    },
+    {
+      "name": "gcc-cxx26-debug",
+      "displayName": "GCC C++26 Debug",
+      "inherits": "gcc-debug",
+      "binaryDir": "${sourceDir}/build/gcc-cxx26-debug",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_CXX26": "ON"
+      }
+    },
+    {
+      "name": "gcc-benchmark",
+      "displayName": "GCC Benchmark",
+      "inherits": "gcc-debug",
+      "binaryDir": "${sourceDir}/build/gcc-benchmark",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CHAISTL_BUILD_TESTS": "OFF",
+        "CHAISTL_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
+      "name": "gcc-asan",
+      "displayName": "GCC ASan",
+      "inherits": "gcc-debug",
+      "binaryDir": "${sourceDir}/build/gcc-asan",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "clang-asan",
+      "displayName": "Clang ASan",
+      "inherits": "clang-debug",
+      "binaryDir": "${sourceDir}/build/clang-asan",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "clang-sanitize",
+      "displayName": "Clang ASan + UBSan",
+      "inherits": "clang-debug",
+      "binaryDir": "${sourceDir}/build/clang-sanitize",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_ASAN": "ON",
+        "CHAISTL_ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "gcc-sanitize",
+      "displayName": "GCC ASan + UBSan",
+      "inherits": "gcc-debug",
+      "binaryDir": "${sourceDir}/build/gcc-sanitize",
+      "cacheVariables": {
+        "CHAISTL_ENABLE_ASAN": "ON",
+        "CHAISTL_ENABLE_UBSAN": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "clang-debug",
+      "configurePreset": "clang-debug"
+    },
+    {
+      "name": "clang-cxx26-debug",
+      "configurePreset": "clang-cxx26-debug"
+    },
+    {
+      "name": "clang-coverage",
+      "configurePreset": "clang-coverage"
+    },
+    {
+      "name": "clang-benchmark",
+      "configurePreset": "clang-benchmark"
+    },
+    {
+      "name": "gcc-debug",
+      "configurePreset": "gcc-debug"
+    },
+    {
+      "name": "gcc-cxx26-debug",
+      "configurePreset": "gcc-cxx26-debug"
+    },
+    {
+      "name": "gcc-benchmark",
+      "configurePreset": "gcc-benchmark"
+    },
+    {
+      "name": "gcc-asan",
+      "configurePreset": "gcc-asan"
+    },
+    {
+      "name": "clang-asan",
+      "configurePreset": "clang-asan"
+    },
+    {
+      "name": "clang-sanitize",
+      "configurePreset": "clang-sanitize"
+    },
+    {
+      "name": "gcc-sanitize",
+      "configurePreset": "gcc-sanitize"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "clang-debug",
+      "configurePreset": "clang-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "clang-quick",
+      "configurePreset": "clang-debug",
+      "filter": {
+        "include": {
+          "label": "smoke|algorithm|concepts|iterators|memory"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "clang-containers",
+      "configurePreset": "clang-debug",
+      "filter": {
+        "include": {
+          "label": "containers"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "clang-policy",
+      "configurePreset": "clang-debug",
+      "filter": {
+        "include": {
+          "label": "policy"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "clang-cxx26-debug",
+      "configurePreset": "clang-cxx26-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "clang-coverage",
+      "configurePreset": "clang-coverage",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-debug",
+      "configurePreset": "gcc-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-quick",
+      "configurePreset": "gcc-debug",
+      "filter": {
+        "include": {
+          "label": "smoke|algorithm|concepts|iterators|memory"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-containers",
+      "configurePreset": "gcc-debug",
+      "filter": {
+        "include": {
+          "label": "containers"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-policy",
+      "configurePreset": "gcc-debug",
+      "filter": {
+        "include": {
+          "label": "policy"
+        }
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-cxx26-debug",
+      "configurePreset": "gcc-cxx26-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "clang-sanitize",
+      "configurePreset": "clang-sanitize",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gcc-sanitize",
+      "configurePreset": "gcc-sanitize",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

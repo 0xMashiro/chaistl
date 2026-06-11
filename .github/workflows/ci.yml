@@ -1,0 +1,224 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install LLVM 22
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 22
+          sudo apt-get install -y clang-format-22
+
+      - name: Check format
+        run: CLANG_FORMAT=clang-format-22 ./scripts/format.sh --check
+
+  core:
+    name: core / ${{ matrix.compiler }} c++23
+    runs-on: ubuntu-24.04
+    needs: format
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: clang
+            preset: clang-debug
+          - compiler: gcc
+            preset: gcc-debug
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install common tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++-14
+
+      - name: Install LLVM 22
+        if: startsWith(matrix.preset, 'clang')
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 22
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DCHAISTL_WERROR=ON
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+  compat:
+    name: compat / ${{ matrix.compiler }} c++26
+    runs-on: ubuntu-24.04
+    needs: core
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: clang
+            preset: clang-cxx26-debug
+          - compiler: gcc
+            preset: gcc-cxx26-debug
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install common tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++-14
+
+      - name: Install LLVM 22
+        if: startsWith(matrix.preset, 'clang')
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 22
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DCHAISTL_WERROR=ON
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+  sanitize:
+    name: sanitize / ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    needs: core
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: clang
+            preset: clang-sanitize
+          - compiler: gcc
+            preset: gcc-sanitize
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install common tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++-14
+
+      - name: Install LLVM 22
+        if: startsWith(matrix.preset, 'clang')
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 22
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DCHAISTL_WERROR=ON
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --output-on-failure
+
+  benchmarks:
+    name: benchmark-build
+    runs-on: ubuntu-24.04
+    needs: core
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Install LLVM 22
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 22
+
+      - name: Configure
+        run: cmake --preset clang-benchmark
+
+      - name: Build benchmarks
+        run: cmake --build --preset clang-benchmark --target chaistl_benchmarks
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-24.04
+    needs: core
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Install LLVM 22
+        run: |
+          wget -O /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x /tmp/llvm.sh
+          sudo /tmp/llvm.sh 22
+
+      - name: Configure
+        run: cmake --preset clang-coverage
+
+      - name: Build
+        run: cmake --build --preset clang-coverage
+
+      - name: Test
+        run: |
+          LLVM_PROFILE_FILE="$PWD/build/clang-coverage/chaistl-%p.profraw" \
+            ctest --preset clang-coverage --output-on-failure
+
+      - name: Report
+        run: |
+          llvm-profdata-22 merge -sparse build/clang-coverage/*.profraw \
+            -o build/clang-coverage/chaistl.profdata
+          llvm-cov-22 report build/clang-coverage/test/chaistl_tests \
+            -instr-profile=build/clang-coverage/chaistl.profdata \
+            --ignore-filename-regex='(third_party|/usr/|test/)'
