@@ -6,4 +6,5 @@
 // facilities are included here; research placeholders stay in their individual
 // headers until they expose a usable API.
 
+#include <chaistl/experimental/containers/open_addressing_set.hpp>
 #include <chaistl/experimental/containers/ring_buffer.hpp>

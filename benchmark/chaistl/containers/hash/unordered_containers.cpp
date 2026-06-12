@@ -15,6 +15,7 @@
 #include <chaistl/containers/power2_unordered_set.hpp>
 #include <chaistl/containers/unordered_map.hpp>
 #include <chaistl/containers/unordered_set.hpp>
+#include <chaistl/experimental/containers/open_addressing_set.hpp>
 
 #include <algorithm>
 #include <benchmark/benchmark.h>
@@ -37,6 +38,9 @@ using key_type = int;
 using mapped_type = int;
 using chaistl_unordered_set = chaistl::unordered_set<key_type>;
 using chaistl_power2_unordered_set = chaistl::power2_unordered_set<key_type>;
+using chaistl_linear_open_addressing_set = chaistl::experimental::linear_open_addressing_set<key_type>;
+using chaistl_quadratic_open_addressing_set = chaistl::experimental::quadratic_open_addressing_set<key_type>;
+using chaistl_double_hashing_open_addressing_set = chaistl::experimental::double_hashing_open_addressing_set<key_type>;
 using std_unordered_set = std::unordered_set<key_type>;
 using chaistl_unordered_map = chaistl::unordered_map<key_type, mapped_type>;
 using chaistl_power2_unordered_map = chaistl::power2_unordered_map<key_type, mapped_type>;
@@ -60,8 +64,20 @@ struct mixed_hash {
 
 using chaistl_shifted_unordered_set = chaistl::unordered_set<key_type, shifted_hash>;
 using chaistl_power2_shifted_unordered_set = chaistl::power2_unordered_set<key_type, shifted_hash>;
+using chaistl_linear_shifted_open_addressing_set =
+    chaistl::experimental::linear_open_addressing_set<key_type, shifted_hash>;
+using chaistl_quadratic_shifted_open_addressing_set =
+    chaistl::experimental::quadratic_open_addressing_set<key_type, shifted_hash>;
+using chaistl_double_hashing_shifted_open_addressing_set =
+    chaistl::experimental::double_hashing_open_addressing_set<key_type, shifted_hash>;
 using chaistl_mixed_unordered_set = chaistl::unordered_set<key_type, mixed_hash>;
 using chaistl_power2_mixed_unordered_set = chaistl::power2_unordered_set<key_type, mixed_hash>;
+using chaistl_linear_mixed_open_addressing_set =
+    chaistl::experimental::linear_open_addressing_set<key_type, mixed_hash>;
+using chaistl_quadratic_mixed_open_addressing_set =
+    chaistl::experimental::quadratic_open_addressing_set<key_type, mixed_hash>;
+using chaistl_double_hashing_mixed_open_addressing_set =
+    chaistl::experimental::double_hashing_open_addressing_set<key_type, mixed_hash>;
 
 std::vector<key_type> random_keys(std::size_t count, unsigned seed) {
   std::vector<key_type> keys(count);
@@ -316,6 +332,12 @@ void register_unordered_map_benchmarks(const char* container_name) {
 const int registered_unordered_benchmarks = [] {
   register_unordered_set_benchmarks<chaistl_unordered_set>("chaistl::unordered_set<int>");
   register_unordered_set_benchmarks<chaistl_power2_unordered_set>("chaistl::power2_unordered_set<int>");
+  register_unordered_set_benchmarks<chaistl_linear_open_addressing_set>(
+      "chaistl::experimental::linear_open_addressing_set<int>");
+  register_unordered_set_benchmarks<chaistl_quadratic_open_addressing_set>(
+      "chaistl::experimental::quadratic_open_addressing_set<int>");
+  register_unordered_set_benchmarks<chaistl_double_hashing_open_addressing_set>(
+      "chaistl::experimental::double_hashing_open_addressing_set<int>");
   register_unordered_set_benchmarks<std_unordered_set>("std::unordered_set<int>");
   register_unordered_map_benchmarks<chaistl_unordered_map>("chaistl::unordered_map<int,int>");
   register_unordered_map_benchmarks<chaistl_power2_unordered_map>("chaistl::power2_unordered_map<int,int>");
@@ -324,9 +346,21 @@ const int registered_unordered_benchmarks = [] {
   register_hash_quality_set_benchmarks<chaistl_shifted_unordered_set>("chaistl::unordered_set<int,shifted_hash>");
   register_hash_quality_set_benchmarks<chaistl_power2_shifted_unordered_set>(
       "chaistl::power2_unordered_set<int,shifted_hash>");
+  register_hash_quality_set_benchmarks<chaistl_linear_shifted_open_addressing_set>(
+      "chaistl::experimental::linear_open_addressing_set<int,shifted_hash>");
+  register_hash_quality_set_benchmarks<chaistl_quadratic_shifted_open_addressing_set>(
+      "chaistl::experimental::quadratic_open_addressing_set<int,shifted_hash>");
+  register_hash_quality_set_benchmarks<chaistl_double_hashing_shifted_open_addressing_set>(
+      "chaistl::experimental::double_hashing_open_addressing_set<int,shifted_hash>");
   register_hash_quality_set_benchmarks<chaistl_mixed_unordered_set>("chaistl::unordered_set<int,mixed_hash>");
   register_hash_quality_set_benchmarks<chaistl_power2_mixed_unordered_set>(
       "chaistl::power2_unordered_set<int,mixed_hash>");
+  register_hash_quality_set_benchmarks<chaistl_linear_mixed_open_addressing_set>(
+      "chaistl::experimental::linear_open_addressing_set<int,mixed_hash>");
+  register_hash_quality_set_benchmarks<chaistl_quadratic_mixed_open_addressing_set>(
+      "chaistl::experimental::quadratic_open_addressing_set<int,mixed_hash>");
+  register_hash_quality_set_benchmarks<chaistl_double_hashing_mixed_open_addressing_set>(
+      "chaistl::experimental::double_hashing_open_addressing_set<int,mixed_hash>");
   return 0;
 }();
 
@@ -334,7 +368,8 @@ const int registered_unordered_benchmarks = [] {
 
 CHAISTL_BENCHMARK_SMOKE_DOMAIN(
     hash,
-    "^(std|chaistl)::unordered_(set<int>|map<int,int>)/"
+    "^((std|chaistl)::unordered_(set<int>|map<int,int>)|chaistl::power2_unordered_set<int>|"
+    "chaistl::experimental::(linear|quadratic|double_hashing)_open_addressing_set<int>)/"
     "(insert_random|lookup_hit|lookup_miss|erase_random|iterate_sum|insert_reserved|insert_no_reserve)/1024$")
 
 }  // namespace chaistl_benchmark
