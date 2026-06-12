@@ -22,11 +22,16 @@
 
 namespace chaistl {
 
-template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = allocator<Key>>
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class Allocator = allocator<Key>,
+          class RehashPolicy>
   requires concepts::container_element<Key> && concepts::allocator_for<Allocator, Key> &&
            detail::hash::hasher_for<Hash, Key> && std::predicate<const KeyEqual&, const Key&, const Key&>
 class unordered_multiset {
-  using table_type = detail::hash::hash_table<Key, Key, detail::hash::identity<Key>, Hash, KeyEqual, Allocator>;
+  using table_type =
+      detail::hash::hash_table<Key, Key, detail::hash::identity<Key>, Hash, KeyEqual, Allocator, RehashPolicy>;
 
  public:
   using key_type = Key;
@@ -230,23 +235,23 @@ class unordered_multiset {
   constexpr iterator insert(node_type&& nh) { return table_.insert_node_multi(nh); }
   constexpr iterator insert(const_iterator, node_type&& nh) { return insert(std::move(nh)); }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator>& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     table_.merge_multi(source.table_);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator>&& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>&& source) {
     merge(source);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator>& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     table_.merge_multi(source.table_);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator>&& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>&& source) {
     merge(source);
   }
 
@@ -323,12 +328,12 @@ class unordered_multiset {
   }
 
  private:
-  template <class K2, class H2, class E2, class A2>
+  template <class K2, class H2, class E2, class A2, class R2>
     requires concepts::container_element<K2> && concepts::allocator_for<A2, K2> && detail::hash::hasher_for<H2, K2> &&
              std::predicate<const E2&, const K2&, const K2&>
   friend class unordered_set;
 
-  template <class K2, class H2, class E2, class A2>
+  template <class K2, class H2, class E2, class A2, class R2>
     requires concepts::container_element<K2> && concepts::allocator_for<A2, K2> && detail::hash::hasher_for<H2, K2> &&
              std::predicate<const E2&, const K2&, const K2&>
   friend class unordered_multiset;
@@ -336,12 +341,19 @@ class unordered_multiset {
   table_type table_;
 };
 
-template <class Key, class Hash, class KeyEqual, class Allocator>
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class Allocator = allocator<Key>>
+using power2_unordered_multiset =
+    unordered_multiset<Key, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
+
+template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
   requires concepts::container_element<Key> && concepts::allocator_for<Allocator, Key> &&
            detail::hash::hasher_for<Hash, Key> && std::predicate<const KeyEqual&, const Key&, const Key&>
-template <class Hash2, class KeyEqual2>
-constexpr void unordered_set<Key, Hash, KeyEqual, Allocator>::merge(
-    unordered_multiset<Key, Hash2, KeyEqual2, Allocator>& source) {
+template <class Hash2, class KeyEqual2, class RehashPolicy2>
+constexpr void unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>::merge(
+    unordered_multiset<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
   table_.merge_unique(source.table_);
 }
 
@@ -408,10 +420,10 @@ template <std::ranges::input_range R, class Hash, class Allocator>
 unordered_multiset(std::from_range_t, R&&, std::size_t, Hash, Allocator)
     -> unordered_multiset<std::ranges::range_value_t<R>, Hash, std::equal_to<std::ranges::range_value_t<R>>, Allocator>;
 
-template <class Key, class Hash, class KeyEqual, class Allocator, class Predicate>
-constexpr typename unordered_multiset<Key, Hash, KeyEqual, Allocator>::size_type erase_if(
-    unordered_multiset<Key, Hash, KeyEqual, Allocator>& set, Predicate pred) {
-  typename unordered_multiset<Key, Hash, KeyEqual, Allocator>::size_type removed = 0;
+template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy, class Predicate>
+constexpr typename unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>::size_type erase_if(
+    unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& set, Predicate pred) {
+  typename unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>::size_type removed = 0;
   for (auto it = set.begin(); it != set.end();) {
     if (pred(*it)) {
       it = set.erase(it);
@@ -423,9 +435,10 @@ constexpr typename unordered_multiset<Key, Hash, KeyEqual, Allocator>::size_type
   return removed;
 }
 
-template <class Key, class Hash, class KeyEqual, class Allocator>
-constexpr void swap(unordered_multiset<Key, Hash, KeyEqual, Allocator>& lhs,
-                    unordered_multiset<Key, Hash, KeyEqual, Allocator>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
+template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
+constexpr void swap(unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+                    unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(
+    noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

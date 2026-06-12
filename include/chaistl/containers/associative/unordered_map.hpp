@@ -24,7 +24,12 @@
 
 namespace chaistl {
 
-template <class Key, class T, class Hash, class KeyEqual, class Allocator>
+template <class Key,
+          class T,
+          class Hash,
+          class KeyEqual,
+          class Allocator,
+          class RehashPolicy = detail::hash::prime_rehash_policy>
   requires concepts::container_element<std::pair<const Key, T>> &&
            concepts::allocator_for<Allocator, std::pair<const Key, T>> && detail::hash::hasher_for<Hash, Key> &&
            std::predicate<const KeyEqual&, const Key&, const Key&>
@@ -57,7 +62,8 @@ template <class Key,
           class T,
           class Hash = std::hash<Key>,
           class KeyEqual = std::equal_to<Key>,
-          class Allocator = allocator<std::pair<const Key, T>>>
+          class Allocator = allocator<std::pair<const Key, T>>,
+          class RehashPolicy = detail::hash::prime_rehash_policy>
   requires concepts::container_element<std::pair<const Key, T>> &&
            concepts::allocator_for<Allocator, std::pair<const Key, T>> && detail::hash::hasher_for<Hash, Key> &&
            std::predicate<const KeyEqual&, const Key&, const Key&>
@@ -67,7 +73,8 @@ class unordered_map {
                                               detail::hash::select1st<std::pair<const Key, T>>,
                                               Hash,
                                               KeyEqual,
-                                              Allocator>;
+                                              Allocator,
+                                              RehashPolicy>;
 
  public:
   // ========================================================================
@@ -489,21 +496,21 @@ class unordered_map {
    * Only the hash and predicate types may differ; spliced nodes keep their
    * original allocation, so element addresses are stable across the merge.
    */
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_map<Key, T, Hash2, KeyEqual2, Allocator>& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_map<Key, T, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     table_.merge_unique(source.table_);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_map<Key, T, Hash2, KeyEqual2, Allocator>&& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_map<Key, T, Hash2, KeyEqual2, Allocator, RehashPolicy2>&& source) {
     merge(source);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_multimap<Key, T, Hash2, KeyEqual2, Allocator>& source);
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_multimap<Key, T, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source);
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_multimap<Key, T, Hash2, KeyEqual2, Allocator>&& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_multimap<Key, T, Hash2, KeyEqual2, Allocator, RehashPolicy2>&& source) {
     merge(source);
   }
 
@@ -646,13 +653,13 @@ class unordered_map {
  private:
   // merge() splices nodes between maps that may differ in hash/predicate
   // type, which requires access to the other instantiation's table_.
-  template <class K2, class T2, class H2, class E2, class A2>
+  template <class K2, class T2, class H2, class E2, class A2, class R2>
     requires concepts::container_element<std::pair<const K2, T2>> &&
              concepts::allocator_for<A2, std::pair<const K2, T2>> && detail::hash::hasher_for<H2, K2> &&
              std::predicate<const E2&, const K2&, const K2&>
   friend class unordered_map;
 
-  template <class K2, class T2, class H2, class E2, class A2>
+  template <class K2, class T2, class H2, class E2, class A2, class R2>
     requires concepts::container_element<std::pair<const K2, T2>> &&
              concepts::allocator_for<A2, std::pair<const K2, T2>> && detail::hash::hasher_for<H2, K2> &&
              std::predicate<const E2&, const K2&, const K2&>
@@ -660,6 +667,14 @@ class unordered_map {
 
   table_type table_;
 };
+
+template <class Key,
+          class T,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class Allocator = allocator<std::pair<const Key, T>>>
+using power2_unordered_map =
+    unordered_map<Key, T, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
 
 // ============================================================================
 // Deduction guides ([unord.map.overview]).
@@ -759,10 +774,10 @@ unordered_map(std::from_range_t, R&&, std::size_t, Hash, Allocator)
 /**
  * @brief Erases all elements satisfying @p pred; returns the number erased.
  */
-template <class Key, class T, class Hash, class KeyEqual, class Allocator, class Predicate>
-constexpr typename unordered_map<Key, T, Hash, KeyEqual, Allocator>::size_type erase_if(
-    unordered_map<Key, T, Hash, KeyEqual, Allocator>& map, Predicate pred) {
-  typename unordered_map<Key, T, Hash, KeyEqual, Allocator>::size_type removed = 0;
+template <class Key, class T, class Hash, class KeyEqual, class Allocator, class RehashPolicy, class Predicate>
+constexpr typename unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>::size_type erase_if(
+    unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& map, Predicate pred) {
+  typename unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>::size_type removed = 0;
   for (auto it = map.begin(); it != map.end();) {
     if (pred(*it)) {
       it = map.erase(it);
@@ -774,9 +789,10 @@ constexpr typename unordered_map<Key, T, Hash, KeyEqual, Allocator>::size_type e
   return removed;
 }
 
-template <class Key, class T, class Hash, class KeyEqual, class Allocator>
-constexpr void swap(unordered_map<Key, T, Hash, KeyEqual, Allocator>& lhs,
-                    unordered_map<Key, T, Hash, KeyEqual, Allocator>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
+template <class Key, class T, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
+constexpr void swap(unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+                    unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(
+    noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

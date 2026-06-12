@@ -302,15 +302,21 @@ class hash_table {
     } else {
       const key_type& key = key_of_value_(value);
       const std::size_t code = hasher_(key);
-      if (hash_node_base* existing = find_node(code, key)) {
-        return {iterator(existing), false};
+      const bool must_rehash = will_rehash_for_one_more();
+      const unique_insert_position position = find_unique_insert_position(code, key);
+      if (position.existing != nullptr) {
+        return {iterator(position.existing), false};
       }
       table_node_type* node = create_node(std::forward<Arg>(value));
       auto guard = detail::make_exception_guard([&] {
         destroy_node(node);
       });
-      reserve_for_one_more();
-      link_node(node, code);
+      if (must_rehash) {
+        reserve_for_one_more();
+        link_node(node, code);
+      } else {
+        link_node_at_bucket_tail(node, code, position.tail_link);
+      }
       guard.complete();
       return {iterator(node), true};
     }
@@ -359,11 +365,17 @@ class hash_table {
     });
     const key_type& key = key_of_value_(node->value);
     const std::size_t code = hasher_(key);
-    if (hash_node_base* existing = find_node(code, key)) {
-      return {iterator(existing), false};
+    const bool must_rehash = will_rehash_for_one_more();
+    const unique_insert_position position = find_unique_insert_position(code, key);
+    if (position.existing != nullptr) {
+      return {iterator(position.existing), false};
     }
-    reserve_for_one_more();
-    link_node(node, code);
+    if (must_rehash) {
+      reserve_for_one_more();
+      link_node(node, code);
+    } else {
+      link_node_at_bucket_tail(node, code, position.tail_link);
+    }
     guard.complete();
     return {iterator(node), true};
   }
@@ -395,8 +407,10 @@ class hash_table {
   template <class K, class... Args>
   constexpr std::pair<iterator, bool> try_emplace_unique(K&& key, Args&&... args) {
     const std::size_t code = hasher_(key);
-    if (hash_node_base* existing = find_node(code, key)) {
-      return {iterator(existing), false};
+    const bool must_rehash = will_rehash_for_one_more();
+    const unique_insert_position position = find_unique_insert_position(code, key);
+    if (position.existing != nullptr) {
+      return {iterator(position.existing), false};
     }
     table_node_type* node = create_node(std::piecewise_construct,
                                         std::forward_as_tuple(std::forward<K>(key)),
@@ -404,8 +418,12 @@ class hash_table {
     auto guard = detail::make_exception_guard([&] {
       destroy_node(node);
     });
-    reserve_for_one_more();
-    link_node(node, code);
+    if (must_rehash) {
+      reserve_for_one_more();
+      link_node(node, code);
+    } else {
+      link_node_at_bucket_tail(node, code, position.tail_link);
+    }
     guard.complete();
     return {iterator(node), true};
   }
@@ -420,15 +438,21 @@ class hash_table {
   template <class K>
   constexpr std::pair<iterator, bool> insert_transparent_unique(K&& key) {
     const std::size_t code = hasher_(key);
-    if (hash_node_base* existing = find_node(code, key)) {
-      return {iterator(existing), false};
+    const bool must_rehash = will_rehash_for_one_more();
+    const unique_insert_position position = find_unique_insert_position(code, key);
+    if (position.existing != nullptr) {
+      return {iterator(position.existing), false};
     }
     table_node_type* node = create_node(std::forward<K>(key));
     auto guard = detail::make_exception_guard([&] {
       destroy_node(node);
     });
-    reserve_for_one_more();
-    link_node(node, code);
+    if (must_rehash) {
+      reserve_for_one_more();
+      link_node(node, code);
+    } else {
+      link_node_at_bucket_tail(node, code, position.tail_link);
+    }
     guard.complete();
     return {iterator(node), true};
   }
@@ -528,11 +552,17 @@ class hash_table {
     table_node_type* node = handle.ptr();
     const key_type& key = key_of_value_(node->value);
     const std::size_t code = hasher_(key);
-    if (hash_node_base* existing = find_node(code, key)) {
-      return {iterator(existing), false};
+    const bool must_rehash = will_rehash_for_one_more();
+    const unique_insert_position position = find_unique_insert_position(code, key);
+    if (position.existing != nullptr) {
+      return {iterator(position.existing), false};
     }
-    reserve_for_one_more();  // throws: the handle still owns the node
-    link_node(node, code);
+    if (must_rehash) {
+      reserve_for_one_more();  // throws: the handle still owns the node
+      link_node(node, code);
+    } else {
+      link_node_at_bucket_tail(node, code, position.tail_link);
+    }
     (void)handle.release();
     return {iterator(node), true};
   }
@@ -565,8 +595,9 @@ class hash_table {
    *
    * @pre Equal allocators (the standard's splicing precondition).
    */
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge_unique(hash_table<Key, Value, KeyOfValue, Hash2, KeyEqual2, Allocator, RehashPolicy>& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge_unique(
+      hash_table<Key, Value, KeyOfValue, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     CHAI_HARDENED(node_allocator_ == source.node_allocator_, "hash_table::merge_unique: allocator mismatch");
     hash_node_base* node = source.order_head_;
     while (node != nullptr) {
@@ -574,18 +605,25 @@ class hash_table {
       table_node_type* typed = static_cast<table_node_type*>(node);
       const key_type& key = key_of_value_(typed->value);
       const std::size_t code = hasher_(key);
-      if (find_node(code, key) == nullptr) {
-        reserve_for_one_more();  // throws: the node is still in source
-        source.unlink_node(node);
-        link_node(typed, code);
+      const bool must_rehash = will_rehash_for_one_more();
+      const unique_insert_position position = find_unique_insert_position(code, key);
+      if (position.existing == nullptr) {
+        if (must_rehash) {
+          reserve_for_one_more();  // throws: the node is still in source
+          source.unlink_node(node);
+          link_node(typed, code);
+        } else {
+          source.unlink_node(node);
+          link_node_at_bucket_tail(typed, code, position.tail_link);
+        }
       }
       node = next;
     }
   }
 
   /// Splices every element of @p source, preserving equivalent-key groups.
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge_multi(hash_table<Key, Value, KeyOfValue, Hash2, KeyEqual2, Allocator, RehashPolicy>& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge_multi(hash_table<Key, Value, KeyOfValue, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     CHAI_HARDENED(node_allocator_ == source.node_allocator_, "hash_table::merge_multi: allocator mismatch");
     hash_node_base* node = source.order_head_;
     while (node != nullptr) {
@@ -924,6 +962,11 @@ class hash_table {
              std::predicate<const E2&, const K2&, const K2&>
   friend class hash_table;
 
+  struct unique_insert_position {
+    hash_node_base* existing = nullptr;
+    hash_node_base** tail_link = nullptr;
+  };
+
   // ========================================================================
   // Node lifetime
   // ========================================================================
@@ -991,6 +1034,18 @@ class hash_table {
   constexpr void link_node(table_node_type* node, std::size_t code) noexcept {
     node->cached_hash = code;
     link_bucket_tail(bucket_head_for(code), node);
+    link_order_tail(node);
+    ++size_;
+  }
+
+  constexpr void link_node_at_bucket_tail(table_node_type* node,
+                                          std::size_t code,
+                                          hash_node_base** tail_link) noexcept {
+    CHAI_HARDENED(tail_link != nullptr, "hash_table::link_node_at_bucket_tail: missing tail link");
+    CHAI_HARDENED(*tail_link == nullptr, "hash_table::link_node_at_bucket_tail: tail link must be empty");
+    node->cached_hash = code;
+    node->next_in_bucket = nullptr;
+    *tail_link = node;
     link_order_tail(node);
     ++size_;
   }
@@ -1119,6 +1174,25 @@ class hash_table {
     return nullptr;
   }
 
+  // A unique insert miss can reuse the null link reached by lookup as the
+  // bucket insertion point. That link is only stable when the insert will not
+  // rehash; callers deliberately fall back to link_node() after growth.
+  template <class K>
+  [[nodiscard]] constexpr unique_insert_position find_unique_insert_position(std::size_t code, const K& key) {
+    if (bucket_count_ == 0) {
+      return {};
+    }
+    hash_node_base** link = std::addressof(buckets()[bucket_index_for(code)]);
+    while (*link != nullptr) {
+      hash_node_base* node = *link;
+      if (node->cached_hash == code && key_equal_(key_of_value_(static_cast<table_node_type*>(node)->value), key)) {
+        return {.existing = node};
+      }
+      link = std::addressof(node->next_in_bucket);
+    }
+    return {.tail_link = link};
+  }
+
   /// Smallest bucket count b with `element_count <= max_load_factor() * b`.
   [[nodiscard]] constexpr size_type minimum_bucket_count(size_type element_count) const noexcept {
     size_type required = static_cast<size_type>(static_cast<float>(element_count) / max_load_factor_);
@@ -1130,9 +1204,13 @@ class hash_table {
 
   /// Grows the bucket array if one more element would exceed the load bound.
   constexpr void reserve_for_one_more() {
-    if (rehash_policy_.need_rehash(size_, 1, bucket_count_, max_load_factor_)) {
+    if (will_rehash_for_one_more()) {
       rebuild_bucket_array(rehash_policy_.next_bucket_count(minimum_bucket_count(size_ + 1)));
     }
+  }
+
+  [[nodiscard]] constexpr bool will_rehash_for_one_more() const noexcept {
+    return rehash_policy_.need_rehash(size_, 1, bucket_count_, max_load_factor_);
   }
 
   constexpr void rebuild_bucket_array(size_type new_bucket_count) {

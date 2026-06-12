@@ -6,7 +6,9 @@
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstddef>
+#include <limits>
 
 namespace chaistl::detail::hash {
 
@@ -117,6 +119,50 @@ class prime_rehash_policy {
 
   /// Largest bucket count this policy can produce.
   [[nodiscard]] static constexpr size_type max_bucket_count() noexcept { return prime_bucket_counts.back(); }
+};
+
+/**
+ * @brief Power-of-two bucket counts with mask-based bucket indexing.
+ *
+ * This policy mirrors the MSVC / PBDS style trade-off: `hash & (B - 1)` is
+ * cheaper than modulo, but the hash function must provide useful low bits.
+ * It is intentionally an opt-in policy; the default remains prime-based for
+ * tolerance of simple teaching hashers.
+ */
+class power2_rehash_policy {
+ public:
+  using size_type = std::size_t;
+
+  [[nodiscard]] static constexpr size_type next_bucket_count(size_type requested) noexcept {
+    constexpr size_type min_bucket_count = 2;
+    if (requested <= min_bucket_count) {
+      return min_bucket_count;
+    }
+    CHAI_HARDENED(requested <= max_bucket_count(),
+                  "power2_rehash_policy::next_bucket_count: beyond max_bucket_count()");
+    return std::bit_ceil(requested);
+  }
+
+  [[nodiscard]] static constexpr size_type bucket_for_hash(std::size_t hash_code, size_type bucket_count) noexcept {
+    CHAI_HARDENED(bucket_count > 0, "power2_rehash_policy::bucket_for_hash: zero buckets");
+    CHAI_HARDENED((bucket_count & (bucket_count - 1)) == 0,
+                  "power2_rehash_policy::bucket_for_hash: bucket count must be a power of two");
+    return hash_code & (bucket_count - 1);
+  }
+
+  [[nodiscard]] static constexpr bool need_rehash(size_type current_size,
+                                                  size_type incoming_count,
+                                                  size_type bucket_count,
+                                                  float max_load_factor) noexcept {
+    if (bucket_count == 0) {
+      return true;
+    }
+    return static_cast<float>(current_size + incoming_count) > max_load_factor * static_cast<float>(bucket_count);
+  }
+
+  [[nodiscard]] static constexpr size_type max_bucket_count() noexcept {
+    return size_type{1} << (std::numeric_limits<size_type>::digits - 1);
+  }
 };
 
 }  // namespace chaistl::detail::hash

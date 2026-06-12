@@ -41,6 +41,10 @@
 #include <chaistl/containers/order_statistic_multiset.hpp>
 #include <chaistl/containers/order_statistic_set.hpp>
 #include <chaistl/containers/pairing_heap.hpp>
+#include <chaistl/containers/power2_unordered_map.hpp>
+#include <chaistl/containers/power2_unordered_multimap.hpp>
+#include <chaistl/containers/power2_unordered_multiset.hpp>
+#include <chaistl/containers/power2_unordered_set.hpp>
 #include <chaistl/containers/size_balanced_map.hpp>
 #include <chaistl/containers/size_balanced_multimap.hpp>
 #include <chaistl/containers/size_balanced_multiset.hpp>

@@ -21,7 +21,7 @@
 
 namespace chaistl {
 
-template <class Key, class Hash, class KeyEqual, class Allocator>
+template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy = detail::hash::prime_rehash_policy>
   requires concepts::container_element<Key> && concepts::allocator_for<Allocator, Key> &&
            detail::hash::hasher_for<Hash, Key> && std::predicate<const KeyEqual&, const Key&, const Key&>
 class unordered_multiset;
@@ -52,11 +52,16 @@ class unordered_multiset;
  *   - cppreference: https://en.cppreference.com/w/cpp/container/unordered_set
  *   - ADR: Hash Table Design (docs/develop/decisions/hash-table-design.md)
  */
-template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = allocator<Key>>
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class Allocator = allocator<Key>,
+          class RehashPolicy = detail::hash::prime_rehash_policy>
   requires concepts::container_element<Key> && concepts::allocator_for<Allocator, Key> &&
            detail::hash::hasher_for<Hash, Key> && std::predicate<const KeyEqual&, const Key&, const Key&>
 class unordered_set {
-  using table_type = detail::hash::hash_table<Key, Key, detail::hash::identity<Key>, Hash, KeyEqual, Allocator>;
+  using table_type =
+      detail::hash::hash_table<Key, Key, detail::hash::identity<Key>, Hash, KeyEqual, Allocator, RehashPolicy>;
 
  public:
   // ========================================================================
@@ -351,21 +356,21 @@ class unordered_set {
    * deallocatable by this container's allocator. Element addresses are
    * stable across the merge.
    */
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator>& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     table_.merge_unique(source.table_);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator>&& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_set<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>&& source) {
     merge(source);
   }
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator>& source);
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source);
 
-  template <class Hash2, class KeyEqual2>
-  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator>&& source) {
+  template <class Hash2, class KeyEqual2, class RehashPolicy2>
+  constexpr void merge(unordered_multiset<Key, Hash2, KeyEqual2, Allocator, RehashPolicy2>&& source) {
     merge(source);
   }
 
@@ -514,18 +519,25 @@ class unordered_set {
  private:
   // merge() splices nodes between sets that may differ in hash/predicate
   // type, which requires access to the other instantiation's table_.
-  template <class K2, class H2, class E2, class A2>
+  template <class K2, class H2, class E2, class A2, class R2>
     requires concepts::container_element<K2> && concepts::allocator_for<A2, K2> && detail::hash::hasher_for<H2, K2> &&
              std::predicate<const E2&, const K2&, const K2&>
   friend class unordered_set;
 
-  template <class K2, class H2, class E2, class A2>
+  template <class K2, class H2, class E2, class A2, class R2>
     requires concepts::container_element<K2> && concepts::allocator_for<A2, K2> && detail::hash::hasher_for<H2, K2> &&
              std::predicate<const E2&, const K2&, const K2&>
   friend class unordered_multiset;
 
   table_type table_;
 };
+
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class Allocator = allocator<Key>>
+using power2_unordered_set =
+    unordered_set<Key, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
 
 // ============================================================================
 // Deduction guides ([unord.set.overview]).
@@ -601,10 +613,10 @@ unordered_set(std::from_range_t, R&&, std::size_t, Hash, Allocator)
 /**
  * @brief Erases all elements satisfying @p pred; returns the number erased.
  */
-template <class Key, class Hash, class KeyEqual, class Allocator, class Predicate>
-constexpr typename unordered_set<Key, Hash, KeyEqual, Allocator>::size_type erase_if(
-    unordered_set<Key, Hash, KeyEqual, Allocator>& set, Predicate pred) {
-  typename unordered_set<Key, Hash, KeyEqual, Allocator>::size_type removed = 0;
+template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy, class Predicate>
+constexpr typename unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>::size_type erase_if(
+    unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& set, Predicate pred) {
+  typename unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>::size_type removed = 0;
   for (auto it = set.begin(); it != set.end();) {
     if (pred(*it)) {
       it = set.erase(it);
@@ -616,9 +628,9 @@ constexpr typename unordered_set<Key, Hash, KeyEqual, Allocator>::size_type eras
   return removed;
 }
 
-template <class Key, class Hash, class KeyEqual, class Allocator>
-constexpr void swap(unordered_set<Key, Hash, KeyEqual, Allocator>& lhs,
-                    unordered_set<Key, Hash, KeyEqual, Allocator>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
+template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
+constexpr void swap(unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+                    unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

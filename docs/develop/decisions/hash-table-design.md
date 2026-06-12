@@ -11,6 +11,11 @@ ordering of insertion, split the heterogeneous-overload staging by standard
 version, and added two scope decisions (`chaistl::hash`, P2363). Overturned
 draft choices are preserved under Alternatives Considered.
 
+Updated 2026-06-12: the standard containers still default to prime bucket
+counts, but ChaiSTL now also exposes opt-in power-of-two aliases as an
+extension. The default remains conservative because mask-based indexing depends
+on useful low hash bits.
+
 ## Context
 
 `unordered_set` and `unordered_map` need a shared hash table core. The design
@@ -318,20 +323,29 @@ Invariants shared by both paths:
 
 ### Rehash policy
 
-`prime_rehash_policy` is the default and only v1 policy, with an intentionally
-small surface:
+`prime_rehash_policy` is the default policy, with an intentionally small
+surface:
 
 ```
 next_bucket_count(requested)          smallest policy size >= requested
-bucket_for_hash(hash, bucket_count)   modulo for the prime policy
+bucket_for_hash(hash, bucket_count)   maps a cached hash to a bucket index
 need_rehash(size, incoming, bucket_count, max_load_factor)
 ```
 
 It owns nothing else: no range hashing, no probing, no tombstones, no growth
 exotica. Prime-based sizing is the default because it tolerates weak user
-hashes, which suits a teaching library. A power-of-two policy with explicit
-mixing (e.g. Fibonacci) is a planned experimental follow-up — it is the right
-vehicle for teaching hash mixing, and the wrong default.
+hashes, which suits a teaching library and makes simple hash functors less
+catastrophic.
+
+`power2_rehash_policy` is the opt-in extension behind
+`power2_unordered_set`, `power2_unordered_multiset`,
+`power2_unordered_map`, and `power2_unordered_multimap`. It rounds bucket
+counts to powers of two and computes buckets with `hash & (bucket_count - 1)`.
+That removes a modulo from the hot lookup path, but it also makes low hash
+bits load-bearing. The hash-quality benchmarks intentionally include a
+`shifted_hash` whose low bits are zero and a `mixed_hash` with basic bit
+mixing: the former demonstrates why power-of-two indexing is not the default;
+the latter demonstrates when the opt-in policy is useful.
 
 ### Allocator discipline
 
@@ -546,8 +560,9 @@ Closed during the 2026-06-11 review (answers above):
 
 - Hash-code caching → unconditional in v1; internal trait later; public knob
   only with a second table family.
-- Power-of-two rehash policy → experimental stage, paired with explicit
-  mixing as the teaching vehicle.
+- Power-of-two rehash policy → shipped as opt-in aliases for the chained
+  standard containers; still not the default because hash low-bit quality is a
+  caller responsibility.
 - Transparent lookup staging → C++20 lookup in stage 2, C++23 erase/extract
   in stage 5, C++26 P2363 in stage 6.
 - Direct-chain layout permanence → kept, but with the explicit global
