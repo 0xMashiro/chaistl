@@ -98,33 +98,47 @@ struct binary_heap_policy {
   template <class T, class Compare>
   static constexpr void sift_up(std::span<T> heap, std::size_t index, const Compare& cmp) {
     T value = std::move(heap[index]);
-    while (index > 0 && cmp(heap[parent(index)], value)) {
+    drop_in_from(heap, index, 0, std::move(value), cmp);
+  }
+
+  // The ascending half of a hole sift: starting at the hole `index`, move
+  // ancestors down while they are smaller than `value` (never above `top`),
+  // then drop `value` into the hole where the walk stopped.
+  template <class T, class Compare>
+  static constexpr void drop_in_from(std::span<T> heap, std::size_t index, std::size_t top, T value,
+                                     const Compare& cmp) {
+    while (index > top && cmp(heap[parent(index)], value)) {
       heap[index] = std::move(heap[parent(index)]);
       index = parent(index);
     }
     heap[index] = std::move(value);
   }
 
-  // Slide the hole at `index` toward the leaves, always through the larger
-  // child, until `value` dominates both children; then drop it in.
+  // Slide the hole at `index` all the way to a leaf through the larger
+  // child, then sift `value` back up from the leaf (Floyd's "bounce").
+  //
+  // The naive descent tests `value` against the larger child at every
+  // level — two comparisons per level. But in pop(), `value` came from the
+  // back of the array, i.e. from a leaf: it almost always sinks back near
+  // the bottom, so those per-level tests nearly all answer "keep going".
+  // Racing the hole to a leaf needs only the child-vs-child comparison
+  // (one per level), and the upward phase then pays one comparison per
+  // level over a usually-tiny distance — close to half the comparisons.
+  // libstdc++'s __adjust_heap uses the same strategy.
   template <class T, class Compare>
   static constexpr void sift_down(std::span<T> heap, std::size_t index, T value, const Compare& cmp) {
     const std::size_t size = heap.size();
-    while (true) {
-      std::size_t child = 2 * index + 1;
-      if (child >= size) {
-        break;
-      }
+    const std::size_t top = index;
+    std::size_t child = 2 * index + 1;
+    while (child < size) {
       if (child + 1 < size && cmp(heap[child], heap[child + 1])) {
         ++child;
       }
-      if (!cmp(value, heap[child])) {
-        break;
-      }
       heap[index] = std::move(heap[child]);
       index = child;
+      child = 2 * index + 1;
     }
-    heap[index] = std::move(value);
+    drop_in_from(heap, index, top, std::move(value), cmp);
   }
 };
 

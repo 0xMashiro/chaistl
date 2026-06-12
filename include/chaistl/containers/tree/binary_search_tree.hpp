@@ -1121,7 +1121,10 @@ class binary_search_tree {
   template <class K>
   [[nodiscard]] constexpr iterator find_mutating(const K& key) {
     const lookup_result search = find_search(root(), &header_, key, key_of_value_, key_compare_);
-    notify_access(search.last_visited);
+    // On a hit, splay the found node; on a miss, the descent frontier.
+    // (find_search descends past the match, so last_visited is the leaf
+    // where the descent ended, not the matching node.)
+    notify_access(bound_access_node(search));
     return iterator(search.result);
   }
 

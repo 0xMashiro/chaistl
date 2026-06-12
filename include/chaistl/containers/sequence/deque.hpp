@@ -296,6 +296,14 @@ class deque {
   }
 
   [[nodiscard]] constexpr front_slot prepare_front_slot() {
+    // Fast path: when the new front slot stays inside the current first
+    // block (offset > 0 in a non-empty deque), that block is already
+    // allocated and no map work is needed. Mirrors ensure_back_slot().
+    if (size_ != 0 && first_offset_ != 0) {
+      const size_type offset = first_offset_ - 1;
+      return {first_block_, offset, map_[first_block_] + offset};
+    }
+
     ensure_map();
 
     if (size_ == 0) {
@@ -348,8 +356,16 @@ class deque {
   }
 
   constexpr void ensure_back_slot() {
-    ensure_map();
     const size_type physical = first_offset_ + size_;
+    // Fast path: a non-empty deque whose next slot is neither the first nor
+    // the last position of a block needs no map or block work — the slot
+    // shares a block with the current last element, and that block is
+    // already allocated. This keeps the common push_back free of map
+    // bookkeeping (the boundary cases below run once per block_size pushes).
+    if (size_ != 0 && physical % block_size != 0 && (physical + 1) % block_size != 0) {
+      return;
+    }
+    ensure_map();
     const size_type block_index = ensure_physical_block(physical);
     allocate_block(block_index);
     if ((physical + 1) % block_size == 0) {

@@ -97,25 +97,37 @@ template <class Key, class KeyOfValue, class Compare, class Node>
  * @brief Find the node equivalent to @p key, if any.
  *
  * @c result is either the matching node or @p header. @c last_visited is
- * the final real node compared with @p key, which lets self-adjusting
- * policies splay the hit or the miss frontier without routing find()
- * through lower_bound().
+ * the final real node visited on the descent, which lets self-adjusting
+ * policies splay the miss frontier (on a hit, splay @c result).
+ *
+ * The descent is lower_bound-style — one comparison per node, equality
+ * tested once at the end — rather than the textbook three-way descent
+ * (less / greater / match) with an early exit. The three-way loop looks
+ * cheaper on paper, but measures ~2x slower on large out-of-cache trees:
+ * tree search is a dependent pointer chase, and the extra data-dependent
+ * exit branch defeats branch prediction and speculative execution down
+ * the chain. libstdc++ and libc++ implement find() the same way.
  */
 template <class Key, class KeyOfValue, class Compare, class Node>
 [[nodiscard]] constexpr lookup_result find_search(
     Node* root, bst_node_base* header, const Key& key, const KeyOfValue& kov, const Compare& comp) {
+  bst_node_base* candidate = header;
   bst_node_base* last_visited = nullptr;
   while (root != nullptr) {
     last_visited = root;
     if (comp(kov(root->value), key)) {
       root = static_cast<Node*>(root->right);
-    } else if (comp(key, kov(root->value))) {
-      root = static_cast<Node*>(root->left);
     } else {
-      return {root, last_visited};
+      candidate = root;
+      root = static_cast<Node*>(root->left);
     }
   }
-  return {header, last_visited};
+  // candidate is the lower bound: the leftmost node not less than key.
+  // It is the match unless key is strictly smaller (or no bound exists).
+  if (candidate == header || comp(key, kov(static_cast<Node*>(candidate)->value))) {
+    return {header, last_visited};
+  }
+  return {candidate, last_visited};
 }
 
 /**
