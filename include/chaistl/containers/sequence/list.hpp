@@ -34,6 +34,7 @@
 #include <chaistl/iterator/interface.hpp>
 #include <chaistl/memory/detail/lifetime/exception_guard.hpp>
 #include <chaistl/memory/detail/storage/node_owner.hpp>
+#include <chaistl/memory_resource.hpp>
 #include <chaistl/utility/hardening.hpp>
 
 #include <array>
@@ -1203,5 +1204,12 @@ constexpr void list<T, Allocator>::reverse() noexcept {
   }
   std::swap(header_.next, header_.prev);
 }
+
+namespace pmr {
+
+template <concepts::container_element T>
+using list = chaistl::list<T, chaistl::pmr::polymorphic_allocator<T>>;
+
+}  // namespace pmr
 
 }  // namespace chaistl

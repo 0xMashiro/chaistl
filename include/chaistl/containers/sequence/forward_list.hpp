@@ -38,6 +38,7 @@
 #include <chaistl/iterator/interface.hpp>
 #include <chaistl/memory/detail/lifetime/exception_guard.hpp>
 #include <chaistl/memory/detail/storage/node_owner.hpp>
+#include <chaistl/memory_resource.hpp>
 #include <chaistl/utility/hardening.hpp>
 
 #include <compare>
@@ -1367,5 +1368,12 @@ constexpr void forward_list<T, Allocator>::reverse() noexcept {
   }
   before_begin_.next = prev;
 }
+
+namespace pmr {
+
+template <concepts::container_element T>
+using forward_list = chaistl::forward_list<T, chaistl::pmr::polymorphic_allocator<T>>;
+
+}  // namespace pmr
 
 }  // namespace chaistl

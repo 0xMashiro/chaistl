@@ -1007,4 +1007,11 @@ constexpr typename flat_multimap<Key, T, Compare, KeyContainer, MappedContainer>
   return removed;
 }
 
+namespace pmr {
+
+template <class Key, class T, class Compare = std::less<Key>>
+using flat_multimap = chaistl::flat_multimap<Key, T, Compare, chaistl::pmr::vector<Key>, chaistl::pmr::vector<T>>;
+
+}  // namespace pmr
+
 }  // namespace chaistl

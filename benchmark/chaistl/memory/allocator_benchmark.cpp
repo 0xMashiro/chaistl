@@ -3,12 +3,18 @@
 // Benchmarks for chaistl::allocator vs std::allocator
 // Covers: allocate, deallocate, allocate_at_least, zero-size edge cases
 
+#include <chaistl/containers/list.hpp>
+#include <chaistl/containers/map.hpp>
+#include <chaistl/containers/unordered_map.hpp>
 #include <chaistl/memory/allocator.hpp>
 #include <chaistl/memory_resource.hpp>
 
 #include <benchmark/benchmark.h>
+#include <list>
+#include <map>
 #include <memory>
 #include <memory_resource>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -186,6 +192,87 @@ BENCHMARK(
     ->Args({256, 8})
     ->Args({1024, 1})
     ->Args({1024, 8});
+BENCHMARK(BM_PoolBatchAllocDealloc<std::pmr::synchronized_pool_resource, std::pmr::polymorphic_allocator<int>>)
+    ->Args({256, 1})
+    ->Args({256, 8})
+    ->Args({1024, 1})
+    ->Args({1024, 8});
+BENCHMARK(BM_PoolBatchAllocDealloc<chaistl::pmr::synchronized_pool_resource, chaistl::pmr::polymorphic_allocator<int>>)
+    ->Args({256, 1})
+    ->Args({256, 8})
+    ->Args({1024, 1})
+    ->Args({1024, 8});
+
+// =========================================================================
+// PMR-backed containers: allocator cost under real node workloads
+// =========================================================================
+
+template <class Container, class Resource, class Alloc>
+static void BM_PmrListPushClear(benchmark::State& state) {
+  const auto count = static_cast<int>(state.range(0));
+
+  for (auto _ : state) {
+    Resource resource;
+    Container values{Alloc(&resource)};
+    for (int value = 0; value != count; ++value) {
+      values.push_back(value);
+    }
+    benchmark::DoNotOptimize(values.size());
+    values.clear();
+  }
+
+  state.SetItemsProcessed(state.iterations() * count);
+}
+
+BENCHMARK(BM_PmrListPushClear<std::pmr::list<int>,
+                              std::pmr::unsynchronized_pool_resource,
+                              std::pmr::polymorphic_allocator<int>>)
+    ->Arg(256)
+    ->Arg(1024);
+BENCHMARK(BM_PmrListPushClear<chaistl::pmr::list<int>,
+                              chaistl::pmr::unsynchronized_pool_resource,
+                              chaistl::pmr::polymorphic_allocator<int>>)
+    ->Arg(256)
+    ->Arg(1024);
+
+template <class Container, class Resource, class Alloc>
+static void BM_PmrMapEmplaceClear(benchmark::State& state) {
+  const auto count = static_cast<int>(state.range(0));
+
+  for (auto _ : state) {
+    Resource resource;
+    Container values{Alloc(&resource)};
+    for (int value = 0; value != count; ++value) {
+      values.emplace(value, value);
+    }
+    benchmark::DoNotOptimize(values.size());
+    values.clear();
+  }
+
+  state.SetItemsProcessed(state.iterations() * count);
+}
+
+BENCHMARK(BM_PmrMapEmplaceClear<std::pmr::map<int, int>,
+                                std::pmr::unsynchronized_pool_resource,
+                                std::pmr::polymorphic_allocator<std::pair<const int, int>>>)
+    ->Arg(256)
+    ->Arg(1024);
+BENCHMARK(BM_PmrMapEmplaceClear<chaistl::pmr::map<int, int>,
+                                chaistl::pmr::unsynchronized_pool_resource,
+                                chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>>)
+    ->Arg(256)
+    ->Arg(1024);
+
+BENCHMARK(BM_PmrMapEmplaceClear<std::pmr::unordered_map<int, int>,
+                                std::pmr::unsynchronized_pool_resource,
+                                std::pmr::polymorphic_allocator<std::pair<const int, int>>>)
+    ->Arg(256)
+    ->Arg(1024);
+BENCHMARK(BM_PmrMapEmplaceClear<chaistl::pmr::unordered_map<int, int>,
+                                chaistl::pmr::unsynchronized_pool_resource,
+                                chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>>)
+    ->Arg(256)
+    ->Arg(1024);
 
 // =========================================================================
 // Large allocation (page-boundary stress)

@@ -43,6 +43,7 @@
 #include <chaistl/containers/tree/key_extract.hpp>
 #include <chaistl/containers/tree/policy/rb_tree.hpp>
 #include <chaistl/memory/allocator.hpp>
+#include <chaistl/memory_resource.hpp>
 #include <chaistl/utility/hardening.hpp>
 
 #include <compare>
@@ -576,5 +577,12 @@ constexpr void swap(multimap<Key, T, Compare, Allocator, Policy>& lhs,
 
 template <class Key, class T, class Compare = std::less<Key>, class Allocator = allocator<std::pair<const Key, T>>>
 using rb_multimap = multimap<Key, T, Compare, Allocator, detail::tree::rb_tree_policy>;
+
+namespace pmr {
+
+template <class Key, class T, class Compare = std::less<Key>>
+using multimap = chaistl::multimap<Key, T, Compare, chaistl::pmr::polymorphic_allocator<std::pair<const Key, T>>>;
+
+}  // namespace pmr
 
 }  // namespace chaistl

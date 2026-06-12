@@ -40,6 +40,7 @@
 #include <chaistl/containers/tree/key_extract.hpp>
 #include <chaistl/containers/tree/policy/rb_tree.hpp>
 #include <chaistl/memory/allocator.hpp>
+#include <chaistl/memory_resource.hpp>
 #include <chaistl/utility/hardening.hpp>
 
 #include <compare>
@@ -555,5 +556,12 @@ constexpr void swap(multiset<Key, Compare, Allocator, Policy>& lhs,
 
 template <class Key, class Compare = std::less<Key>, class Allocator = allocator<Key>>
 using rb_multiset = multiset<Key, Compare, Allocator, detail::tree::rb_tree_policy>;
+
+namespace pmr {
+
+template <class Key, class Compare = std::less<Key>>
+using multiset = chaistl::multiset<Key, Compare, chaistl::pmr::polymorphic_allocator<Key>>;
+
+}  // namespace pmr
 
 }  // namespace chaistl

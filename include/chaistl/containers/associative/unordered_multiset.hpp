@@ -10,6 +10,7 @@
 #include <chaistl/containers/hash/hash_table.hpp>
 #include <chaistl/containers/hash/key_extract.hpp>
 #include <chaistl/memory/allocator.hpp>
+#include <chaistl/memory_resource.hpp>
 
 #include <concepts>
 #include <cstddef>
@@ -439,5 +440,12 @@ constexpr void swap(
     unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
+
+namespace pmr {
+
+template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>>
+using unordered_multiset = chaistl::unordered_multiset<Key, Hash, KeyEqual, chaistl::pmr::polymorphic_allocator<Key>>;
+
+}  // namespace pmr
 
 }  // namespace chaistl

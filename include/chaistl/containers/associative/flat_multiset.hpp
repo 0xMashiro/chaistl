@@ -685,4 +685,11 @@ constexpr typename flat_multiset<Key, Compare, KeyContainer>::size_type erase_if
   return removed;
 }
 
+namespace pmr {
+
+template <class Key, class Compare = std::less<Key>>
+using flat_multiset = chaistl::flat_multiset<Key, Compare, chaistl::pmr::vector<Key>>;
+
+}  // namespace pmr
+
 }  // namespace chaistl

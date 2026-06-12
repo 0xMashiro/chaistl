@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <new>
 #include <type_traits>
 #include <utility>
@@ -197,8 +198,7 @@ class polymorphic_allocator {
 };
 
 template <class T1, class T2>
-[[nodiscard]] bool operator==(const polymorphic_allocator<T1>& lhs,
-                              const polymorphic_allocator<T2>& rhs) noexcept {
+[[nodiscard]] bool operator==(const polymorphic_allocator<T1>& lhs, const polymorphic_allocator<T2>& rhs) noexcept {
   return *lhs.resource() == *rhs.resource();
 }
 
@@ -410,8 +410,7 @@ class unsynchronized_pool_resource : public memory_resource {
     }
 
     options.max_blocks_per_chunk = max_size(options.max_blocks_per_chunk, 1);
-    options.largest_required_pool_block =
-        bit_ceil(max_size(options.largest_required_pool_block, sizeof(void*)));
+    options.largest_required_pool_block = bit_ceil(max_size(options.largest_required_pool_block, sizeof(void*)));
     return options;
   }
 
@@ -493,6 +492,50 @@ class unsynchronized_pool_resource : public memory_resource {
   oversized_header* oversized_ = nullptr;
 };
 
+// Thread-safe facade over the same size-class pool strategy. The mutex keeps
+// allocation and deallocation simple and explicit for teaching; it is not a
+// per-thread-cache allocator.
+class synchronized_pool_resource : public memory_resource {
+ public:
+  synchronized_pool_resource() : synchronized_pool_resource(pool_options{}, get_default_resource()) {}
+
+  explicit synchronized_pool_resource(memory_resource* upstream)
+      : synchronized_pool_resource(pool_options{}, upstream) {}
+
+  explicit synchronized_pool_resource(const pool_options& options)
+      : synchronized_pool_resource(options, get_default_resource()) {}
+
+  synchronized_pool_resource(const pool_options& options, memory_resource* upstream) : inner_(options, upstream) {}
+
+  synchronized_pool_resource(const synchronized_pool_resource&) = delete;
+  synchronized_pool_resource& operator=(const synchronized_pool_resource&) = delete;
+
+  void release() {
+    const std::lock_guard lock(mutex_);
+    inner_.release();
+  }
+
+  [[nodiscard]] memory_resource* upstream_resource() const noexcept { return inner_.upstream_resource(); }
+
+  [[nodiscard]] pool_options options() const noexcept { return inner_.options(); }
+
+ private:
+  void* do_allocate(std::size_t bytes, std::size_t alignment) override {
+    const std::lock_guard lock(mutex_);
+    return inner_.allocate(bytes, alignment);
+  }
+
+  void do_deallocate(void* pointer, std::size_t bytes, std::size_t alignment) override {
+    const std::lock_guard lock(mutex_);
+    inner_.deallocate(pointer, bytes, alignment);
+  }
+
+  bool do_is_equal(const memory_resource& other) const noexcept override { return this == &other; }
+
+  mutable std::mutex mutex_;
+  unsynchronized_pool_resource inner_;
+};
+
 // Bump-pointer resource: allocation advances through the current buffer,
 // deallocation is a no-op, and release() drops all upstream chunks at once.
 class monotonic_buffer_resource : public memory_resource {
@@ -551,9 +594,7 @@ class monotonic_buffer_resource : public memory_resource {
 
   static constexpr std::size_t max_size(std::size_t lhs, std::size_t rhs) noexcept { return lhs < rhs ? rhs : lhs; }
 
-  static constexpr std::size_t round_buffer_size(std::size_t size) noexcept {
-    return max_size(size, min_buffer_size);
-  }
+  static constexpr std::size_t round_buffer_size(std::size_t size) noexcept { return max_size(size, min_buffer_size); }
 
   static constexpr std::size_t scale_buffer_size(std::size_t size) noexcept {
     if (size >= max_buffer_size) {
