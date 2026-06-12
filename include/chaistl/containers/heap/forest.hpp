@@ -58,25 +58,24 @@ class node_forest {
 
   constexpr node_forest(const node_forest& other)
       : alloc_(node_allocator_traits::select_on_container_copy_construction(other.alloc_)) {
-    adopt_clone_of(other);
+    clone_nodes_from(other);
   }
 
-  constexpr node_forest(const node_forest& other, const Allocator& alloc) : alloc_(alloc) { adopt_clone_of(other); }
+  constexpr node_forest(const node_forest& other, const Allocator& alloc) : alloc_(alloc) { clone_nodes_from(other); }
 
   constexpr node_forest(node_forest&& other) noexcept
       : root(std::exchange(other.root, nullptr)),
         count(std::exchange(other.count, 0)),
         alloc_(std::move(other.alloc_)) {}
 
-  // Allocator-extended move: steal when the allocators can free each other's
+  // Allocator-extended move: take storage when the allocators can free each other's
   // memory, otherwise rebuild node by node, moving the values across.
   // Either way `other` ends up empty — one postcondition, two costs.
   constexpr node_forest(node_forest&& other, const Allocator& alloc) : alloc_(alloc) {
     if (alloc_ == other.alloc_) {
-      root = std::exchange(other.root, nullptr);
-      count = std::exchange(other.count, 0);
+      take_storage_from(other);
     } else {
-      adopt_clone_of(std::move(other));
+      clone_nodes_from(std::move(other));
       other.clear();
     }
   }
@@ -93,7 +92,7 @@ class node_forest {
     if constexpr (node_allocator_traits::propagate_on_container_copy_assignment::value) {
       alloc_ = other.alloc_;
     }
-    adopt_clone_of(other);
+    clone_nodes_from(other);
     return *this;
   }
 
@@ -106,11 +105,11 @@ class node_forest {
     clear();
     if constexpr (node_allocator_traits::propagate_on_container_move_assignment::value) {
       alloc_ = std::move(other.alloc_);
-      steal(other);
+      take_storage_from(other);
     } else if (alloc_ == other.alloc_) {
-      steal(other);
+      take_storage_from(other);
     } else {
-      adopt_clone_of(std::move(other));
+      clone_nodes_from(std::move(other));
       other.clear();
     }
     return *this;
@@ -186,7 +185,7 @@ class node_forest {
  private:
   [[no_unique_address]] node_allocator_type alloc_{};
 
-  constexpr void steal(node_forest& other) noexcept {
+  constexpr void take_storage_from(node_forest& other) noexcept {
     root = std::exchange(other.root, nullptr);
     count = std::exchange(other.count, 0);
   }
@@ -196,7 +195,7 @@ class node_forest {
   // copied; an rvalue source has its values moved out (its structure is left
   // intact for the caller to clear()).
   template <class Forest>
-  constexpr void adopt_clone_of(Forest&& other) {
+  constexpr void clone_nodes_from(Forest&& other) {
     constexpr bool move_values = !std::is_lvalue_reference_v<Forest>;
     using source_node = std::conditional_t<move_values, node_type, const node_type>;
 

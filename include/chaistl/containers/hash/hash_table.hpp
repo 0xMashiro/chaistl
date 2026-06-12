@@ -169,14 +169,14 @@ class hash_table {
         rehash_policy_(std::move(other.rehash_policy_)),
         node_allocator_(alloc) {
     if (node_allocator_ == other.node_allocator_) {
-      steal_structure(other);
+      take_storage_from(other);
     } else {
       // Unequal allocators: nodes cannot change owners, move element-wise.
       move_values_from(other);
     }
   }
 
-  constexpr ~hash_table() { destroy_all(); }
+  constexpr ~hash_table() { destroy_and_deallocate_storage(); }
 
   // ========================================================================
   // Assignment / swap
@@ -186,7 +186,7 @@ class hash_table {
     if (this == std::addressof(other)) {
       return *this;
     }
-    destroy_all();  // deallocate with the pre-assignment allocator
+    destroy_and_deallocate_storage();  // deallocate with the pre-assignment allocator
     if constexpr (meta::propagate_on_container_copy_assignment_v<node_allocator_type>) {
       node_allocator_ = other.node_allocator_;
     }
@@ -207,7 +207,7 @@ class hash_table {
     if (this == std::addressof(other)) {
       return *this;
     }
-    destroy_all();
+    destroy_and_deallocate_storage();
     key_of_value_ = std::move(other.key_of_value_);
     hasher_ = std::move(other.hasher_);
     key_equal_ = std::move(other.key_equal_);
@@ -215,10 +215,10 @@ class hash_table {
     max_load_factor_ = other.max_load_factor_;
     if constexpr (meta::propagate_on_container_move_assignment_v<node_allocator_type>) {
       node_allocator_ = std::move(other.node_allocator_);
-      steal_structure(other);
+      take_storage_from(other);
     } else {
       if (node_allocator_ == other.node_allocator_) {
-        steal_structure(other);
+        take_storage_from(other);
       } else {
         move_values_from(other);
       }
@@ -854,7 +854,7 @@ class hash_table {
     }
     const size_type target = rehash_policy_.next_bucket_count(required);
     if (target != bucket_count_) {
-      do_rehash(target);
+      rebuild_bucket_array(target);
     }
   }
 
@@ -985,23 +985,15 @@ class hash_table {
   // Linking
   // ========================================================================
 
-  /// Links a detached node into both structures. No user code; cannot fail.
+  /// Links a detached unique-key node into both structures. No user code; cannot fail.
   constexpr void link_node(table_node_type* node, std::size_t code) noexcept {
     node->cached_hash = code;
-    hash_node_base** bucket_head = buckets() + rehash_policy_.bucket_for_hash(code, bucket_count_);
-    link_bucket_tail(*bucket_head, node);
-    node->prev_in_order = order_tail_;
-    node->next_in_order = nullptr;
-    if (order_tail_ != nullptr) {
-      order_tail_->next_in_order = node;
-    } else {
-      order_head_ = node;
-    }
-    order_tail_ = node;
+    link_bucket_tail(bucket_head_for(code), node);
+    link_order_tail(node);
     ++size_;
   }
 
-  /// Links a detached equivalent-key node into an existing segment or at end.
+  /// Links a detached equivalent-key node after the existing key segment.
   constexpr void link_node_multi(table_node_type* node, std::size_t code, hash_node_base* existing) noexcept {
     node->cached_hash = code;
     if (existing == nullptr) {
@@ -1009,36 +1001,16 @@ class hash_table {
       return;
     }
 
-    hash_node_base* order_after = existing;
-    while (order_after->next_in_order != nullptr &&
-           key_equal_(key_of_value_(static_cast<table_node_type*>(order_after->next_in_order)->value),
-                      key_of_value_(node->value))) {
-      order_after = order_after->next_in_order;
-    }
-    node->prev_in_order = order_after;
-    node->next_in_order = order_after->next_in_order;
-    if (order_after->next_in_order != nullptr) {
-      order_after->next_in_order->prev_in_order = node;
-    } else {
-      order_tail_ = node;
-    }
-    order_after->next_in_order = node;
-
-    hash_node_base* bucket_after = existing;
-    while (bucket_after->next_in_bucket != nullptr && bucket_after->next_in_bucket->cached_hash == code &&
-           key_equal_(key_of_value_(static_cast<table_node_type*>(bucket_after->next_in_bucket)->value),
-                      key_of_value_(node->value))) {
-      bucket_after = bucket_after->next_in_bucket;
-    }
-    node->next_in_bucket = bucket_after->next_in_bucket;
-    bucket_after->next_in_bucket = node;
+    const key_type& key = key_of_value_(node->value);
+    link_order_after(last_equivalent_in_order(existing, key), node);
+    link_bucket_after(last_equivalent_in_bucket(existing, code, key), node);
     ++size_;
   }
 
   /// Unlinks @p node from both structures. No user code; cannot fail.
   constexpr void unlink_node(hash_node_base* node) noexcept {
     // Bucket chain: the cached hash locates the bucket without calling Hash.
-    hash_node_base** link = buckets() + rehash_policy_.bucket_for_hash(node->cached_hash, bucket_count_);
+    hash_node_base** link = std::addressof(bucket_head_for(node->cached_hash));
     while (*link != node) {
       link = &(*link)->next_in_bucket;
     }
@@ -1057,6 +1029,36 @@ class hash_table {
     --size_;
   }
 
+  [[nodiscard]] constexpr size_type bucket_index_for(std::size_t code) const noexcept {
+    return rehash_policy_.bucket_for_hash(code, bucket_count_);
+  }
+
+  [[nodiscard]] constexpr hash_node_base*& bucket_head_for(std::size_t code) noexcept {
+    return buckets()[bucket_index_for(code)];
+  }
+
+  constexpr void link_order_tail(hash_node_base* node) noexcept {
+    node->prev_in_order = order_tail_;
+    node->next_in_order = nullptr;
+    if (order_tail_ != nullptr) {
+      order_tail_->next_in_order = node;
+    } else {
+      order_head_ = node;
+    }
+    order_tail_ = node;
+  }
+
+  constexpr void link_order_after(hash_node_base* position, hash_node_base* node) noexcept {
+    node->prev_in_order = position;
+    node->next_in_order = position->next_in_order;
+    if (position->next_in_order != nullptr) {
+      position->next_in_order->prev_in_order = node;
+    } else {
+      order_tail_ = node;
+    }
+    position->next_in_order = node;
+  }
+
   static constexpr void link_bucket_tail(hash_node_base*& head, hash_node_base* node) noexcept {
     node->next_in_bucket = nullptr;
     if (head == nullptr) {
@@ -1070,6 +1072,32 @@ class hash_table {
     tail->next_in_bucket = node;
   }
 
+  static constexpr void link_bucket_after(hash_node_base* position, hash_node_base* node) noexcept {
+    node->next_in_bucket = position->next_in_bucket;
+    position->next_in_bucket = node;
+  }
+
+  [[nodiscard]] constexpr hash_node_base* last_equivalent_in_order(hash_node_base* first,
+                                                                    const key_type& key) const noexcept {
+    hash_node_base* last = first;
+    while (last->next_in_order != nullptr &&
+           key_equal_(key_of_value_(static_cast<table_node_type*>(last->next_in_order)->value), key)) {
+      last = last->next_in_order;
+    }
+    return last;
+  }
+
+  [[nodiscard]] constexpr hash_node_base* last_equivalent_in_bucket(hash_node_base* first,
+                                                                     std::size_t code,
+                                                                     const key_type& key) const noexcept {
+    hash_node_base* last = first;
+    while (last->next_in_bucket != nullptr && last->next_in_bucket->cached_hash == code &&
+           key_equal_(key_of_value_(static_cast<table_node_type*>(last->next_in_bucket)->value), key)) {
+      last = last->next_in_bucket;
+    }
+    return last;
+  }
+
   // ========================================================================
   // Lookup / rehash internals
   // ========================================================================
@@ -1079,7 +1107,7 @@ class hash_table {
     if (bucket_count_ == 0) {
       return nullptr;
     }
-    const size_type index = rehash_policy_.bucket_for_hash(code, bucket_count_);
+    const size_type index = bucket_index_for(code);
     for (hash_node_base* node = buckets()[index]; node != nullptr; node = node->next_in_bucket) {
       // Full-hash prefilter: KeyEqual only runs on hash-equal candidates.
       if (node->cached_hash == code && key_equal_(key_of_value_(static_cast<table_node_type*>(node)->value), key)) {
@@ -1101,11 +1129,11 @@ class hash_table {
   /// Grows the bucket array if one more element would exceed the load bound.
   constexpr void reserve_for_one_more() {
     if (rehash_policy_.need_rehash(size_, 1, bucket_count_, max_load_factor_)) {
-      do_rehash(rehash_policy_.next_bucket_count(minimum_bucket_count(size_ + 1)));
+      rebuild_bucket_array(rehash_policy_.next_bucket_count(minimum_bucket_count(size_ + 1)));
     }
   }
 
-  constexpr void do_rehash(size_type new_bucket_count) {
+  constexpr void rebuild_bucket_array(size_type new_bucket_count) {
     bucket_pointer new_buckets = allocate_bucket_array(new_bucket_count);
     auto new_buckets_guard = detail::make_exception_guard([&] {
       deallocate_bucket_array(new_buckets, new_bucket_count);
@@ -1146,13 +1174,13 @@ class hash_table {
     size_ = 0;
   }
 
-  constexpr void destroy_all() noexcept {
+  constexpr void destroy_and_deallocate_storage() noexcept {
     clear_nodes();
     deallocate_buckets();
   }
 
-  /// @pre *this owns nothing (freshly constructed or destroy_all'ed).
-  constexpr void steal_structure(hash_table& other) noexcept {
+  /// @pre *this owns no storage (freshly constructed or already destroyed).
+  constexpr void take_storage_from(hash_table& other) noexcept {
     buckets_ = std::exchange(other.buckets_, bucket_pointer{});
     bucket_count_ = std::exchange(other.bucket_count_, 0);
     order_head_ = std::exchange(other.order_head_, nullptr);
@@ -1170,7 +1198,7 @@ class hash_table {
    */
   constexpr void copy_from(const hash_table& other) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_all();
+      destroy_and_deallocate_storage();
     });
     if (other.bucket_count_ > 0) {
       allocate_initial_buckets(other.bucket_count_);
@@ -1185,7 +1213,7 @@ class hash_table {
   /// Rebuilds this (empty) table by moving values out of @p other's nodes.
   constexpr void move_values_from(hash_table& other) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_all();
+      destroy_and_deallocate_storage();
     });
     if (other.bucket_count_ > 0) {
       allocate_initial_buckets(other.bucket_count_);

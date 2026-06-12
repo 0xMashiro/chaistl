@@ -101,7 +101,7 @@ struct heap_node {
  * what it becomes to my successor. @p node keeps its children.
  */
 template <class T, class E>
-constexpr void splice_out(heap_node<T, E>* node, heap_node<T, E>*& root) noexcept {
+constexpr void unlink_from_list(heap_node<T, E>* node, heap_node<T, E>*& root) noexcept {
   heap_node<T, E>* prev = node->prev_or_parent;
   heap_node<T, E>* next = node->next_sibling;
   if (prev == nullptr) {
@@ -127,7 +127,7 @@ constexpr void splice_out(heap_node<T, E>* node, heap_node<T, E>*& root) noexcep
  * @pre node->prev_or_parent != nullptr
  */
 template <class T, class E>
-constexpr void splice_out(heap_node<T, E>* node) noexcept {
+constexpr void unlink_from_list(heap_node<T, E>* node) noexcept {
   heap_node<T, E>* prev = node->prev_or_parent;
   heap_node<T, E>* next = node->next_sibling;
   if (prev->first_child == node) {
@@ -156,10 +156,10 @@ constexpr void link_first_child(heap_node<T, E>* child, heap_node<T, E>* parent)
 }
 
 /**
- * @brief Prepend detached tree @p node to the forest's root list.
+ * @brief Link detached tree @p node at the front of the forest's root list.
  */
 template <class T, class E>
-constexpr void push_front(heap_node<T, E>* node, heap_node<T, E>*& root) noexcept {
+constexpr void link_root_front(heap_node<T, E>* node, heap_node<T, E>*& root) noexcept {
   node->prev_or_parent = nullptr;
   node->next_sibling = root;
   if (root != nullptr) {

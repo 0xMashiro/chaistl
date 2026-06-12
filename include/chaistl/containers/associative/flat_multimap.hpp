@@ -387,22 +387,22 @@ class flat_multimap {
 
   template <std::input_iterator InputIt>
   constexpr void insert(InputIt first, InputIt last) {
-    append_and_merge(first, last, false);
+    append_iterator_range_and_normalize(first, last, false);
   }
 
   template <std::input_iterator InputIt>
   constexpr void insert(sorted_equivalent_t, InputIt first, InputIt last) {
-    append_and_merge(first, last, true);
+    append_iterator_range_and_normalize(first, last, true);
   }
 
   template <concepts::container_compatible_range<value_type> R>
   constexpr void insert_range(R&& range) {
-    append_and_merge_range(std::forward<R>(range), false);
+    append_range_and_normalize(std::forward<R>(range), false);
   }
 
   template <concepts::container_compatible_range<value_type> R>
   constexpr void insert_range(sorted_equivalent_t, R&& range) {
-    append_and_merge_range(std::forward<R>(range), true);
+    append_range_and_normalize(std::forward<R>(range), true);
   }
 
   constexpr void insert(std::initializer_list<value_type> init) { insert(init.begin(), init.end()); }
@@ -792,7 +792,7 @@ class flat_multimap {
   };
 
   template <class Container>
-  [[nodiscard]] static constexpr Container make_empty_like(const Container& source) {
+  [[nodiscard]] static constexpr Container make_empty_with_allocator_of(const Container& source) {
     if constexpr (requires { Container(source.get_allocator()); }) {
       return Container(source.get_allocator());
     } else {
@@ -801,26 +801,26 @@ class flat_multimap {
   }
 
   template <class InputIt>
-  constexpr void append_and_merge(InputIt first, InputIt last, bool tail_is_sorted_equivalent) {
+  constexpr void append_iterator_range_and_normalize(InputIt first, InputIt last, bool tail_is_sorted_equivalent) {
     const auto old_size = size();
     tail_rollback_guard guard{this, old_size};
     for (; first != last; ++first) {
       value_type value(*first);
       append(std::move(value.first), std::move(value.second));
     }
-    merge_tail(old_size, tail_is_sorted_equivalent);
+    normalize_appended_tail(old_size, tail_is_sorted_equivalent);
     guard.complete();
   }
 
   template <class R>
-  constexpr void append_and_merge_range(R&& range, bool tail_is_sorted_equivalent) {
+  constexpr void append_range_and_normalize(R&& range, bool tail_is_sorted_equivalent) {
     const auto old_size = size();
     tail_rollback_guard guard{this, old_size};
     for (auto&& element : range) {
       value_type value(std::forward<decltype(element)>(element));
       append(std::move(value.first), std::move(value.second));
     }
-    merge_tail(old_size, tail_is_sorted_equivalent);
+    normalize_appended_tail(old_size, tail_is_sorted_equivalent);
     guard.complete();
   }
 
@@ -844,7 +844,7 @@ class flat_multimap {
   // libstdc++/libc++ form, but libstdc++ 14 still dispatches stable_sort and
   // inplace_merge on iterator_category, which rejects proxy iterators. The
   // index-permutation gather is the portable equivalent.
-  constexpr void merge_tail(size_type old_size, bool tail_is_sorted_equivalent) {
+  constexpr void normalize_appended_tail(size_type old_size, bool tail_is_sorted_equivalent) {
     if (old_size == keys_.size()) return;
     const size_type tail_size = keys_.size() - old_size;
 
@@ -863,8 +863,8 @@ class flat_multimap {
                     "chaistl::flat_multimap: sorted_equivalent insertion is invalid");
     }
 
-    auto merged_keys = make_empty_like(keys_);
-    auto merged_values = make_empty_like(values_);
+    auto merged_keys = make_empty_with_allocator_of(keys_);
+    auto merged_values = make_empty_with_allocator_of(values_);
     if constexpr (requires { merged_keys.reserve(size_type{}); }) {
       merged_keys.reserve(keys_.size());
     }
@@ -873,7 +873,7 @@ class flat_multimap {
     }
 
     clear_on_failure_guard guard{this};
-    const auto take = [&](size_type index) {
+    const auto move_entry_at = [&](size_type index) {
       merged_keys.insert(merged_keys.end(), std::move(keys_[index]));
       merged_values.insert(merged_values.end(), std::move(values_[index]));
     };
@@ -881,21 +881,21 @@ class flat_multimap {
     size_type tail = 0;
     while (prefix < old_size && tail < tail_size) {
       if (compare_(keys_[prefix], keys_[order[tail]])) {
-        take(prefix);
+        move_entry_at(prefix);
         ++prefix;
       } else if (compare_(keys_[order[tail]], keys_[prefix])) {
-        take(order[tail]);
+        move_entry_at(order[tail]);
         ++tail;
       } else {
-        take(prefix);  // existing equivalent keys stay first
+        move_entry_at(prefix);  // existing equivalent keys stay first
         ++prefix;
       }
     }
     for (; prefix < old_size; ++prefix) {
-      take(prefix);
+      move_entry_at(prefix);
     }
     for (; tail < tail_size; ++tail) {
-      take(order[tail]);
+      move_entry_at(order[tail]);
     }
 
     keys_ = std::move(merged_keys);
@@ -903,7 +903,7 @@ class flat_multimap {
     guard.complete();
   }
 
-  constexpr void sort_only() { merge_tail(0, false); }
+  constexpr void sort_only() { normalize_appended_tail(0, false); }
 
   template <class K, class M>
   constexpr void append(K&& key, M&& mapped) {

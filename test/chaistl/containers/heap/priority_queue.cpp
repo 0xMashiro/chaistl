@@ -63,7 +63,7 @@ struct Flip {
 };
 
 // Minimal stateful allocator: equality by id, no propagation. Forces the
-// allocator-extended move constructor down both the steal (equal) and the
+// allocator-extended move constructor down both the take-storage (equal) and the
 // rebuild (unequal) paths.
 template <class T>
 struct IdAlloc {
@@ -411,7 +411,7 @@ TYPED_TEST(HeapPolicyTest, AllocatorExtendedMoveWithUnequalAllocatorRebuilds) {
     a.push(v);
   }
 
-  PQ same_alloc(std::move(a), IdAlloc<int>{1});  // steal path
+  PQ same_alloc(std::move(a), IdAlloc<int>{1});  // take-storage path
   EXPECT_EQ(same_alloc.size(), 3uz);
   EXPECT_EQ(same_alloc.top(), 9);
 

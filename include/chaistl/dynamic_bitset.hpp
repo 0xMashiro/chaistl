@@ -368,9 +368,9 @@ class dynamic_bitset {
     return result;
   }
 
-  [[nodiscard]] constexpr size_type find_first() const noexcept { return find_next_impl(npos); }
+  [[nodiscard]] constexpr size_type find_first() const noexcept { return find_next_after(npos); }
 
-  [[nodiscard]] constexpr size_type find_next(size_type pos) const noexcept { return find_next_impl(pos); }
+  [[nodiscard]] constexpr size_type find_next(size_type pos) const noexcept { return find_next_after(pos); }
 
   template <class CharT = char, class Traits = std::char_traits<CharT>, class Alloc = std::allocator<CharT>>
   [[nodiscard]] constexpr std::basic_string<CharT, Traits, Alloc> to_string(CharT zero = CharT('0'),
@@ -429,7 +429,7 @@ class dynamic_bitset {
 
   constexpr void flip_unchecked(size_type pos) noexcept { blocks_[block_index(pos)] ^= bit_mask(pos); }
 
-  [[nodiscard]] constexpr size_type find_next_impl(size_type previous) const noexcept {
+  [[nodiscard]] constexpr size_type find_next_after(size_type previous) const noexcept {
     const size_type start = previous == npos ? 0 : previous + 1;
     if (start >= size_) {
       return npos;

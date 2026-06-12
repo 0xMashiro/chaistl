@@ -44,7 +44,7 @@ TEST(UnorderedMapCons, CopyAndMove) {
 
   const std::string* stable = &source.find(1)->second;
   chaistl::unordered_map<int, std::string> moved(std::move(source));
-  EXPECT_EQ(stable, &moved.find(1)->second);  // nodes stolen, addresses stable
+  EXPECT_EQ(stable, &moved.find(1)->second);  // nodes transferred, addresses stable
   EXPECT_TRUE(moved.validate());
 }
 

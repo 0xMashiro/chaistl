@@ -21,7 +21,7 @@ namespace chaistl::heap_policy {
 //
 //   insert       O(1) amortized    prepend B₀, propagate carries
 //   top          O(log n)          scan the root list
-//   extract_top  O(log n)          splice the max root, fold its children in
+//   extract_top  O(log n)          unlink the max root, fold its children in
 //   join         O(log n)          zip two root lists, propagate carries
 //   detach       O(log² n) worst   bubble the node to its tree root, then
 //                                  remove it like a maximum
@@ -78,7 +78,7 @@ struct binomial_heap_policy {
   template <class Node, class Compare>
   static constexpr void insert(Node* node, Node*& root, const Compare& cmp) {
     node->extension.degree = 0;
-    detail::heap::push_front(node, root);  // degree 0 in front keeps the list sorted
+    detail::heap::link_root_front(node, root);  // degree 0 in front keeps the list sorted
     coalesce(root, cmp);
   }
 
@@ -104,7 +104,7 @@ struct binomial_heap_policy {
     try {
       coalesce(root, cmp);
     } catch (...) {
-      detail::heap::push_front(m, root);  // undo: nothing was extracted after all
+      detail::heap::link_root_front(m, root);  // undo: nothing was extracted after all
       throw;
     }
     return m;
@@ -128,7 +128,7 @@ struct binomial_heap_policy {
     try {
       coalesce(root, cmp);
     } catch (...) {
-      detail::heap::push_front(node, root);
+      detail::heap::link_root_front(node, root);
       throw;
     }
     return node;
@@ -194,7 +194,7 @@ struct binomial_heap_policy {
    * link triples are exchanged and the at-most-six neighbors re-aim their
    * edges. Because only a first child points up, no child list needs
    * re-parenting; the back-edge disambiguation (`first_child == x`) is the
-   * same one splice_out relies on.
+   * same one unlink_from_list relies on.
    */
   template <class Node>
   static constexpr void swap_with_parent(Node* node, Node* parent, Node*& root) noexcept {
@@ -251,7 +251,7 @@ struct binomial_heap_policy {
    */
   template <class Node>
   static constexpr void extract_root(Node* node, Node*& root) noexcept {
-    detail::heap::splice_out(node, root);
+    detail::heap::unlink_from_list(node, root);
 
     // Strip the children (degrees k-1 … 0) and reverse: a root list (0 … k-1).
     Node* reversed = nullptr;
@@ -284,7 +284,7 @@ struct binomial_heap_policy {
   }
 
   /**
-   * @brief Merge two degree-sorted root lists into one. Pure splicing —
+   * @brief Merge two degree-sorted root lists into one. Pure pointer relinking —
    * no comparator, noexcept; this is what makes join's ownership transfer
    * unconditional. Output is sorted in the relaxed (nondecreasing) sense.
    */
@@ -317,7 +317,7 @@ struct binomial_heap_policy {
    * equal degrees in a row [Bₖ Bₖ Bₖ], melding the first pair would put a
    * Bₖ₊₁ in front of a Bₖ and unsort the list — so step past the first and
    * let the later pair meld. The winner of a meld is always the tree left
-   * sitting in the list (the loser is spliced out from under it), so the
+   * sitting in the list (the loser is unlinked from under it), so the
    * list stays sorted and every comparison happens between linked nodes.
    */
   template <class Node, class Compare>
@@ -333,12 +333,12 @@ struct binomial_heap_policy {
         continue;
       }
       if (cmp(cur->value, next->value)) {
-        detail::heap::splice_out(cur, root);
+        detail::heap::unlink_from_list(cur, root);
         detail::heap::link_first_child(cur, next);
         ++next->extension.degree;
         cur = next;
       } else {
-        detail::heap::splice_out(next, root);
+        detail::heap::unlink_from_list(next, root);
         detail::heap::link_first_child(next, cur);
         ++cur->extension.degree;
         // stay on cur: its new degree may match the new neighbor's

@@ -100,13 +100,11 @@ template <class Key, class KeyOfValue, class Compare, class Node>
  * the final real node visited on the descent, which lets self-adjusting
  * policies splay the miss frontier (on a hit, splay @c result).
  *
- * The descent is lower_bound-style — one comparison per node, equality
- * tested once at the end — rather than the textbook three-way descent
- * (less / greater / match) with an early exit. The three-way loop looks
- * cheaper on paper, but measures ~2x slower on large out-of-cache trees:
- * tree search is a dependent pointer chase, and the extra data-dependent
- * exit branch defeats branch prediction and speculative execution down
- * the chain. libstdc++ and libc++ implement find() the same way.
+ * The descent is lower_bound-style: one direction test per node, then one
+ * equality check at the end. On real trees this beats the textbook three-way
+ * loop because the search is a dependent pointer chase; an extra early-exit
+ * branch at every node gives the predictor more work but rarely shortens the
+ * memory dependency chain. Major STL tree implementations use this shape.
  */
 template <class Key, class KeyOfValue, class Compare, class Node>
 [[nodiscard]] constexpr lookup_result find_search(
@@ -122,8 +120,8 @@ template <class Key, class KeyOfValue, class Compare, class Node>
       root = static_cast<Node*>(root->left);
     }
   }
-  // candidate is the lower bound: the leftmost node not less than key.
-  // It is the match unless key is strictly smaller (or no bound exists).
+  // `candidate` is lower_bound(key); it is a match unless key is strictly
+  // smaller than the candidate key (or no lower bound exists).
   if (candidate == header || comp(key, kov(static_cast<Node*>(candidate)->value))) {
     return {header, last_visited};
   }

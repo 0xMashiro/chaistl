@@ -95,6 +95,9 @@ struct d_ary_heap_policy {
           best = child;
         }
       }
+      // Keep the stop test in the d-ary heap. Floyd's bounce helps d=2 by
+      // skipping one value-vs-child comparison per level; here each overshot
+      // level costs a full scan of up to Arity children.
       if (!cmp(value, heap[best])) {
         break;
       }

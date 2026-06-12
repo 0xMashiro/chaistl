@@ -41,7 +41,7 @@ struct fibonacci_heap_policy {
   template <class Node, class Compare>
   static constexpr void insert(Node* node, Node*& root, const Compare&) noexcept {
     node->extension.degree = 0;
-    detail::heap::push_front(node, root);
+    detail::heap::link_root_front(node, root);
   }
 
   template <class Node, class Compare>
@@ -52,12 +52,12 @@ struct fibonacci_heap_policy {
   template <class Node, class Compare>
   [[nodiscard]] static constexpr Node* extract_top(Node*& root, const Compare& cmp) {
     Node* m = find_top(root, cmp);  // no mutation before the first comparison sweep completes
-    detail::heap::splice_out(m, root);
+    detail::heap::unlink_from_list(m, root);
     promote_children(m, root);
     try {
       consolidate(root, cmp);
     } catch (...) {
-      detail::heap::push_front(m, root);
+      detail::heap::link_root_front(m, root);
       throw;
     }
     return m;
@@ -154,7 +154,7 @@ struct fibonacci_heap_policy {
         slots[degree] = nullptr;
         Node* winner = cmp(cur->value, other->value) ? other : cur;
         Node* loser = winner == cur ? other : cur;
-        detail::heap::splice_out(loser, root);
+        detail::heap::unlink_from_list(loser, root);
         detail::heap::link_first_child(loser, winner);
         winner->extension.degree = degree + 1;
         cur = winner;

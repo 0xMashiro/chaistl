@@ -406,22 +406,22 @@ class flat_map {
 
   template <std::input_iterator InputIt>
   constexpr void insert(InputIt first, InputIt last) {
-    append_and_merge(first, last, false);
+    append_iterator_range_and_normalize(first, last, false);
   }
 
   template <std::input_iterator InputIt>
   constexpr void insert(sorted_unique_t, InputIt first, InputIt last) {
-    append_and_merge(first, last, true);
+    append_iterator_range_and_normalize(first, last, true);
   }
 
   template <concepts::container_compatible_range<value_type> R>
   constexpr void insert_range(R&& range) {
-    append_and_merge_range(std::forward<R>(range), false);
+    append_range_and_normalize(std::forward<R>(range), false);
   }
 
   template <concepts::container_compatible_range<value_type> R>
   constexpr void insert_range(sorted_unique_t, R&& range) {
-    append_and_merge_range(std::forward<R>(range), true);
+    append_range_and_normalize(std::forward<R>(range), true);
   }
 
   constexpr void insert(std::initializer_list<value_type> init) { insert(init.begin(), init.end()); }
@@ -884,7 +884,7 @@ class flat_map {
   };
 
   template <class Container>
-  [[nodiscard]] static constexpr Container make_empty_like(const Container& source) {
+  [[nodiscard]] static constexpr Container make_empty_with_allocator_of(const Container& source) {
     if constexpr (requires { Container(source.get_allocator()); }) {
       return Container(source.get_allocator());
     } else {
@@ -909,26 +909,26 @@ class flat_map {
   }
 
   template <class InputIt>
-  constexpr void append_and_merge(InputIt first, InputIt last, bool tail_is_sorted_unique) {
+  constexpr void append_iterator_range_and_normalize(InputIt first, InputIt last, bool tail_is_sorted_unique) {
     const auto old_size = size();
     tail_rollback_guard guard{this, old_size};
     for (; first != last; ++first) {
       value_type value(*first);
       append(std::move(value.first), std::move(value.second));
     }
-    merge_tail(old_size, tail_is_sorted_unique);
+    normalize_appended_tail(old_size, tail_is_sorted_unique);
     guard.complete();
   }
 
   template <class R>
-  constexpr void append_and_merge_range(R&& range, bool tail_is_sorted_unique) {
+  constexpr void append_range_and_normalize(R&& range, bool tail_is_sorted_unique) {
     const auto old_size = size();
     tail_rollback_guard guard{this, old_size};
     for (auto&& element : range) {
       value_type value(std::forward<decltype(element)>(element));
       append(std::move(value.first), std::move(value.second));
     }
-    merge_tail(old_size, tail_is_sorted_unique);
+    normalize_appended_tail(old_size, tail_is_sorted_unique);
     guard.complete();
   }
 
@@ -951,7 +951,7 @@ class flat_map {
   // libstdc++/libc++ form, but libstdc++ 14 still dispatches stable_sort and
   // inplace_merge on iterator_category, which rejects proxy iterators. The
   // index-permutation gather is the portable equivalent.
-  constexpr void merge_tail(size_type old_size, bool tail_is_sorted_unique) {
+  constexpr void normalize_appended_tail(size_type old_size, bool tail_is_sorted_unique) {
     if (old_size == keys_.size()) return;
     const size_type tail_size = keys_.size() - old_size;
 
@@ -977,8 +977,8 @@ class flat_map {
                     "chaistl::flat_map: sorted_unique insertion is invalid");
     }
 
-    auto merged_keys = make_empty_like(keys_);
-    auto merged_values = make_empty_like(values_);
+    auto merged_keys = make_empty_with_allocator_of(keys_);
+    auto merged_values = make_empty_with_allocator_of(values_);
     if constexpr (requires { merged_keys.reserve(size_type{}); }) {
       merged_keys.reserve(old_size + unique_count);
     }
@@ -987,7 +987,7 @@ class flat_map {
     }
 
     clear_on_failure_guard guard{this};
-    const auto take = [&](size_type index) {
+    const auto move_entry_at = [&](size_type index) {
       merged_keys.insert(merged_keys.end(), std::move(keys_[index]));
       merged_values.insert(merged_values.end(), std::move(values_[index]));
     };
@@ -995,22 +995,22 @@ class flat_map {
     size_type tail = 0;
     while (prefix < old_size && tail < unique_count) {
       if (compare_(keys_[prefix], keys_[order[tail]])) {
-        take(prefix);
+        move_entry_at(prefix);
         ++prefix;
       } else if (compare_(keys_[order[tail]], keys_[prefix])) {
-        take(order[tail]);
+        move_entry_at(order[tail]);
         ++tail;
       } else {
-        take(prefix);  // existing mapped value wins over the incoming duplicate
+        move_entry_at(prefix);  // existing mapped value wins over the incoming duplicate
         ++prefix;
         ++tail;
       }
     }
     for (; prefix < old_size; ++prefix) {
-      take(prefix);
+      move_entry_at(prefix);
     }
     for (; tail < unique_count; ++tail) {
-      take(order[tail]);
+      move_entry_at(order[tail]);
     }
 
     keys_ = std::move(merged_keys);
@@ -1018,7 +1018,7 @@ class flat_map {
     guard.complete();
   }
 
-  constexpr void sort_and_unique() { merge_tail(0, false); }
+  constexpr void sort_and_unique() { normalize_appended_tail(0, false); }
 
   template <class K, class M>
   constexpr void append(K&& key, M&& mapped) {

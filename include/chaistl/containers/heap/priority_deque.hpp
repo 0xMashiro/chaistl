@@ -100,6 +100,11 @@ class priority_deque {
     return storage_[max_index()];
   }
 
+  // Mutating operations append/replace in the backing vector, then repair the
+  // min-max heap by comparing and swapping along one ancestor/descendant path.
+  // Allocation/construction failures keep vector's guarantee; a throwing
+  // comparator or element swap can leave the valid storage out of heap order,
+  // matching the usual heap-adaptor boundary.
   constexpr void push(const T& value) {
     storage_.push_back(value);
     bubble_up(storage_.size() - 1);
@@ -118,24 +123,41 @@ class priority_deque {
 
   constexpr void pop_min() {
     CHAI_HARDENED(!empty(), "chaistl::priority_deque::pop_min: empty container");
-    replace_and_trickle(0);
+    remove_at_and_trickle(0);
   }
 
   constexpr void pop_max() {
     CHAI_HARDENED(!empty(), "chaistl::priority_deque::pop_max: empty container");
-    replace_and_trickle(max_index());
+    remove_at_and_trickle(max_index());
   }
 
   constexpr void clear() noexcept { storage_.clear(); }
 
-  constexpr void swap(priority_deque& other) noexcept(noexcept(storage_.swap(other.storage_))) {
+  constexpr void swap(priority_deque& other) noexcept(std::is_nothrow_swappable_v<Compare> &&
+                                                      noexcept(storage_.swap(other.storage_))) {
     using std::swap;
     swap(compare_, other.compare_);
     storage_.swap(other.storage_);
   }
 
+  /**
+   * @brief Check the min-max heap invariant.
+   *
+   * Level parity decides the local order: nodes on min levels are no greater
+   * than their descendants; nodes on max levels are no less than theirs.
+   * O(n), intended for tests and teaching rather than normal container use.
+   */
+  [[nodiscard]] constexpr bool verify() const {
+    for (size_type index = 0; index < storage_.size(); ++index) {
+      if (!node_ordered_before_descendants(index)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
  private:
-  Compare compare_{};
+  [[no_unique_address]] Compare compare_{};
   container_type storage_{};
 
   [[nodiscard]] static constexpr size_type parent(size_type index) noexcept { return (index - 1) / 2; }
@@ -217,7 +239,7 @@ class priority_deque {
     }
   }
 
-  constexpr void replace_and_trickle(size_type index) {
+  constexpr void remove_at_and_trickle(size_type index) {
     if (storage_.size() == 1) {
       storage_.pop_back();
       return;
@@ -309,6 +331,30 @@ class priority_deque {
     if (candidate < storage_.size() && compare_(storage_[best], storage_[candidate])) {
       best = candidate;
     }
+  }
+
+  [[nodiscard]] constexpr bool node_ordered_before_descendants(size_type index) const {
+    const bool min_level = is_min_level(index);
+    for (size_type child = left_child(index); child <= right_child(index); ++child) {
+      if (child < storage_.size() && violates_level_order(index, child, min_level)) {
+        return false;
+      }
+    }
+    for (size_type child = first_grandchild(index); child < first_grandchild(index) + 4; ++child) {
+      if (child < storage_.size() && violates_level_order(index, child, min_level)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  [[nodiscard]] constexpr bool violates_level_order(size_type ancestor,
+                                                    size_type descendant,
+                                                    bool ancestor_min_level) const {
+    if (ancestor_min_level) {
+      return compare_(storage_[descendant], storage_[ancestor]);
+    }
+    return compare_(storage_[ancestor], storage_[descendant]);
   }
 
   constexpr void swap_elements(size_type lhs,

@@ -114,17 +114,10 @@ struct binary_heap_policy {
     heap[index] = std::move(value);
   }
 
-  // Slide the hole at `index` all the way to a leaf through the larger
-  // child, then sift `value` back up from the leaf (Floyd's "bounce").
-  //
-  // The naive descent tests `value` against the larger child at every
-  // level — two comparisons per level. But in pop(), `value` came from the
-  // back of the array, i.e. from a leaf: it almost always sinks back near
-  // the bottom, so those per-level tests nearly all answer "keep going".
-  // Racing the hole to a leaf needs only the child-vs-child comparison
-  // (one per level), and the upward phase then pays one comparison per
-  // level over a usually-tiny distance — close to half the comparisons.
-  // libstdc++'s __adjust_heap uses the same strategy.
+  // Floyd's bounce for pop/make_heap. The displaced value came from a leaf, so
+  // during pop it usually belongs near the bottom; testing it at every level
+  // mostly burns one predictable-false comparison per level. Move the hole to
+  // a leaf first, then use the ordinary sift-up half to place the value.
   template <class T, class Compare>
   static constexpr void sift_down(std::span<T> heap, std::size_t index, T value, const Compare& cmp) {
     const std::size_t size = heap.size();

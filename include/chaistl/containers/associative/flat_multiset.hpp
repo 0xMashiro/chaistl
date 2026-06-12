@@ -309,28 +309,28 @@ class flat_multiset {
   constexpr void insert(InputIt first, InputIt last) {
     const auto old_size = keys_.size();
     keys_.insert(keys_.end(), first, last);
-    sort_merge_tail(old_size, false);
+    normalize_appended_equivalent_tail(old_size, false);
   }
 
   template <std::input_iterator InputIt>
   constexpr void insert(sorted_equivalent_t, InputIt first, InputIt last) {
     const auto old_size = keys_.size();
     keys_.insert(keys_.end(), first, last);
-    sort_merge_tail(old_size, true);
+    normalize_appended_equivalent_tail(old_size, true);
   }
 
   template <concepts::container_compatible_range<value_type> R>
   constexpr void insert_range(R&& range) {
     const auto old_size = keys_.size();
     keys_.insert_range(keys_.end(), std::forward<R>(range));
-    sort_merge_tail(old_size, false);
+    normalize_appended_equivalent_tail(old_size, false);
   }
 
   template <concepts::container_compatible_range<value_type> R>
   constexpr void insert_range(sorted_equivalent_t, R&& range) {
     const auto old_size = keys_.size();
     keys_.insert_range(keys_.end(), std::forward<R>(range));
-    sort_merge_tail(old_size, true);
+    normalize_appended_equivalent_tail(old_size, true);
   }
 
   constexpr void insert(std::initializer_list<value_type> init) { insert(init.begin(), init.end()); }
@@ -547,7 +547,7 @@ class flat_multiset {
 
   constexpr void sort_only() { std::ranges::sort(keys_, compare_); }
 
-  constexpr void sort_merge_tail(size_type old_size, bool tail_is_sorted_equivalent) {
+  constexpr void normalize_appended_equivalent_tail(size_type old_size, bool tail_is_sorted_equivalent) {
     if (old_size == keys_.size()) return;
 
     if (!tail_is_sorted_equivalent) {
@@ -566,10 +566,10 @@ class flat_multiset {
     // container and commit by move; each element is moved exactly once and,
     // unlike std::inplace_merge, the loop is constexpr-friendly before C++26.
     // For equivalent keys the pre-existing elements are kept before incoming
-    // elements. On a throw the
-    // invariant is restored by clearing, the standard flat container policy.
+    // elements. On a throw the invariant is restored by clearing, the standard
+    // flat container policy.
     clear_on_failure_guard guard{this};
-    auto merged = make_empty_like(keys_);
+    auto merged = make_empty_with_allocator_of(keys_);
     if constexpr (requires { merged.reserve(size_type{}); }) {
       merged.reserve(keys_.size());
     }
@@ -599,7 +599,7 @@ class flat_multiset {
   }
 
   template <class Container>
-  [[nodiscard]] static constexpr Container make_empty_like(const Container& source) {
+  [[nodiscard]] static constexpr Container make_empty_with_allocator_of(const Container& source) {
     if constexpr (requires { Container(source.get_allocator()); }) {
       return Container(source.get_allocator());
     } else {

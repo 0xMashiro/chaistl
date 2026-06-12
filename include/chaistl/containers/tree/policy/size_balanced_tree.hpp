@@ -129,7 +129,7 @@ struct size_balanced_tree_policy {
   }
 
   template <class Node>
-  static constexpr bst_node_base* maintain(bst_node_base* node, bst_node_base*& root) noexcept {
+  static constexpr bst_node_base* rebalance_at(bst_node_base* node, bst_node_base*& root) noexcept {
     if (node == nullptr) {
       return nullptr;
     }
@@ -160,16 +160,16 @@ struct size_balanced_tree_policy {
       return node;
     }
 
-    maintain<Node>(node->left, root);
-    maintain<Node>(node->right, root);
-    return maintain<Node>(node, root);
+    rebalance_at<Node>(node->left, root);
+    rebalance_at<Node>(node->right, root);
+    return rebalance_at<Node>(node, root);
   }
 
   template <class Node>
   static constexpr void rebalance_ancestors(bst_node_base* node, bst_node_base& header) noexcept {
     bst_node_base*& root = header.parent;
     while (node != &header) {
-      bst_node_base* const balanced = maintain<Node>(node, root);
+      bst_node_base* const balanced = rebalance_at<Node>(node, root);
       node = balanced->parent;
     }
   }

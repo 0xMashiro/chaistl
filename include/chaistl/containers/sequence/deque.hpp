@@ -296,9 +296,9 @@ class deque {
   }
 
   [[nodiscard]] constexpr front_slot prepare_front_slot() {
-    // Fast path: when the new front slot stays inside the current first
-    // block (offset > 0 in a non-empty deque), that block is already
-    // allocated and no map work is needed. Mirrors ensure_back_slot().
+    // The common push_front stays inside the current first block. That slot is
+    // already allocated, so avoid the map bookkeeping that only block-boundary
+    // pushes need.
     if (size_ != 0 && first_offset_ != 0) {
       const size_type offset = first_offset_ - 1;
       return {first_block_, offset, map_[first_block_] + offset};
@@ -357,11 +357,10 @@ class deque {
 
   constexpr void ensure_back_slot() {
     const size_type physical = first_offset_ + size_;
-    // Fast path: a non-empty deque whose next slot is neither the first nor
-    // the last position of a block needs no map or block work — the slot
-    // shares a block with the current last element, and that block is
-    // already allocated. This keeps the common push_back free of map
-    // bookkeeping (the boundary cases below run once per block_size pushes).
+    // The common push_back writes an interior slot of the current last block.
+    // At a block boundary we also allocate the following block so end() can be
+    // represented as a valid block pointer plus offset, matching this iterator
+    // layout's invariant.
     if (size_ != 0 && physical % block_size != 0 && (physical + 1) % block_size != 0) {
       return;
     }
@@ -464,8 +463,6 @@ class deque {
     first_block_ = 0;
     first_offset_ = 0;
   }
-
-  constexpr void release_storage() noexcept { destroy_and_deallocate_storage(); }
 
   constexpr void take_storage_from(deque& other) noexcept {
     map_ = std::exchange(other.map_, nullptr);
@@ -816,7 +813,7 @@ constexpr deque<T, Allocator>& deque<T, Allocator>::operator=(const deque& other
   }
   if constexpr (meta::propagate_on_container_copy_assignment_v<allocator_type>) {
     deque copy(other, other.get_allocator());
-    release_storage();
+    destroy_and_deallocate_storage();
     copy_allocator_from(other);
     take_storage_from(copy);
   } else {
@@ -834,7 +831,7 @@ constexpr deque<T, Allocator>& deque<T, Allocator>::operator=(deque&& other) noe
   }
 
   if constexpr (meta::propagate_on_container_move_assignment_v<allocator_type>) {
-    release_storage();
+    destroy_and_deallocate_storage();
     move_allocator_from(other);
     take_storage_from(other);
   } else if constexpr (meta::allocator_is_always_equal_v<allocator_type>) {
@@ -897,7 +894,7 @@ constexpr void deque<T, Allocator>::resize(size_type count, const T& value) {
 template <concepts::container_element T, concepts::allocator_for<T> Allocator>
 constexpr void deque<T, Allocator>::shrink_to_fit() {
   if (empty()) {
-    release_storage();
+    destroy_and_deallocate_storage();
     return;
   }
 

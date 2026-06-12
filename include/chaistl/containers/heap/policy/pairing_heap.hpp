@@ -99,7 +99,7 @@ struct pairing_heap_policy {
       condensed->prev_or_parent = nullptr;
       detail::heap::replace_in_list(node, condensed, root);
     } else {
-      detail::heap::splice_out(node, root);
+      detail::heap::unlink_from_list(node, root);
     }
     return node;
   }
@@ -161,7 +161,7 @@ struct pairing_heap_policy {
 
  private:
   // Meld adjacent pairs of `parent`'s children, left to right. The loser of
-  // each pair is spliced out and hung under the winner, so the winner is
+  // each loser is unlinked and hung under the winner, so the winner is
   // left occupying the pair's position in the child list — the list shrinks
   // in place and stays well-formed at every comparison point.
   template <class Node, class Compare>
@@ -172,7 +172,7 @@ struct pairing_heap_policy {
       Node* rest = b->next_sibling;
       Node* loser = cmp(a->value, b->value) ? a : b;
       Node* winner = (loser == a) ? b : a;
-      detail::heap::splice_out(loser);  // never the forest head: it has a predecessor
+      detail::heap::unlink_from_list(loser);  // never the forest head: it has a predecessor
       detail::heap::link_first_child(loser, winner);
       a = rest;
     }
@@ -195,7 +195,7 @@ struct pairing_heap_policy {
       Node* prev = tail->prev_or_parent;  // a sibling: tail is not the first child
       Node* loser = cmp(prev->value, tail->value) ? prev : tail;
       Node* winner = (loser == prev) ? tail : prev;
-      detail::heap::splice_out(loser);
+      detail::heap::unlink_from_list(loser);
       detail::heap::link_first_child(loser, winner);
       tail = winner;  // the winner now holds the folded position
     }

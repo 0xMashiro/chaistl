@@ -97,7 +97,7 @@ TEST(UnorderedSetCons, MoveConstructorStealsStorage) {
   chaistl::unordered_set<int> target(std::move(source));
 
   EXPECT_THAT(target, UnorderedElementsAre(1, 2, 3));
-  // Node-based moves steal the nodes: element addresses survive.
+  // Node-based moves take the nodes: element addresses survive.
   EXPECT_EQ(stable, &*target.find(2));
   // This implementation leaves the source empty (valid, unspecified per the
   // standard; pinned here as a regression guard).

@@ -263,7 +263,7 @@ class binary_search_tree {
         node_allocator_(std::move(other.node_allocator_)),
         size_(std::exchange(other.size_, 0)) {
     init_header();
-    steal_header_from(other);
+    take_header_from(other);
   }
 
   constexpr binary_search_tree(binary_search_tree&& other, const Allocator& alloc)
@@ -271,7 +271,7 @@ class binary_search_tree {
     init_header();
     if (node_allocator_ == other.node_allocator_) {
       size_ = std::exchange(other.size_, 0);
-      steal_header_from(other);
+      take_header_from(other);
     } else {
       // Different allocators: nodes must be reallocated, move the elements.
       auto guard = detail::make_exception_guard([this] {
@@ -319,10 +319,10 @@ class binary_search_tree {
       if constexpr (meta::propagate_on_container_move_assignment_v<node_allocator_type> ||
                     meta::allocator_is_always_equal_v<node_allocator_type>) {
         size_ = std::exchange(other.size_, 0);
-        steal_header_from(other);
+        take_header_from(other);
       } else if (node_allocator_ == other.node_allocator_) {
         size_ = std::exchange(other.size_, 0);
-        steal_header_from(other);
+        take_header_from(other);
       } else {
         // Different allocators: nodes must be reallocated, move the elements.
         for (auto& value : other) {
@@ -1059,12 +1059,12 @@ class binary_search_tree {
   }
 
   /**
-   * @brief Adopt another tree's nodes by relinking its header into ours.
+   * @brief Take another tree's nodes by relinking its header into ours.
    *
    * Precondition: this tree is empty with an initialized header; sizes
    * are handled by the caller. @p other is left empty.
    */
-  constexpr void steal_header_from(binary_search_tree& other) noexcept {
+  constexpr void take_header_from(binary_search_tree& other) noexcept {
     if (other.header_.parent != nullptr) {
       header_.parent = other.header_.parent;
       header_.left = other.header_.left;
@@ -1121,9 +1121,9 @@ class binary_search_tree {
   template <class K>
   [[nodiscard]] constexpr iterator find_mutating(const K& key) {
     const lookup_result search = find_search(root(), &header_, key, key_of_value_, key_compare_);
-    // On a hit, splay the found node; on a miss, the descent frontier.
-    // (find_search descends past the match, so last_visited is the leaf
-    // where the descent ended, not the matching node.)
+    // A lower_bound-shaped find may keep descending left after seeing an
+    // equivalent key. For splay trees the access is the public lookup result on
+    // hit, not the last node touched by that implementation detail.
     notify_access(bound_access_node(search));
     return iterator(search.result);
   }
@@ -1134,9 +1134,9 @@ class binary_search_tree {
         find_search(root(), const_cast<bst_node_base*>(&header_), key, key_of_value_, key_compare_).result);
   }
 
-  // Bounds follow the STL convention and return end() when no bound exists.
-  // A self-adjusting tree still needs a real node to splay on that miss, so
-  // access notification falls back to the final node visited by the descent.
+  // Public bounds/find return end() on a miss. Self-adjusting policies still
+  // need a real node to rotate, so misses notify the final node reached by the
+  // descent; ordinary policies compile this path away.
   [[nodiscard]] constexpr bst_node_base* bound_access_node(const lookup_result& search) noexcept {
     return search.result != &header_ ? search.result : search.last_visited;
   }

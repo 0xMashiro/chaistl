@@ -170,7 +170,7 @@ class priority_queue {
       Policy::make(mutable_span(), compare_);
     } else {
       for (; first != last; ++first) {
-        unchecked_push(*first);
+        create_and_insert_node(*first);
       }
     }
   }
@@ -191,7 +191,7 @@ class priority_queue {
       Policy::make(mutable_span(), compare_);
     } else {
       for (auto&& value : range) {
-        unchecked_push(std::forward<decltype(value)>(value));
+        create_and_insert_node(std::forward<decltype(value)>(value));
       }
     }
   }
@@ -265,37 +265,37 @@ class priority_queue {
   constexpr point_iterator push(const T& value)
     requires has_stable_handles
   {
-    return point_iterator(unchecked_push(value));
+    return point_iterator(create_and_insert_node(value));
   }
 
   constexpr point_iterator push(T&& value)
     requires has_stable_handles
   {
-    return point_iterator(unchecked_push(std::move(value)));
+    return point_iterator(create_and_insert_node(std::move(value)));
   }
 
   constexpr void push(const T& value)
     requires(!has_stable_handles)
   {
-    do_push(value);
+    push_value(value);
   }
 
   constexpr void push(T&& value)
     requires(!has_stable_handles)
   {
-    do_push(std::move(value));
+    push_value(std::move(value));
   }
 
   template <class... Args>
     requires std::constructible_from<T, Args...> && has_stable_handles
   constexpr point_iterator emplace(Args&&... args) {
-    return point_iterator(unchecked_push(std::forward<Args>(args)...));
+    return point_iterator(create_and_insert_node(std::forward<Args>(args)...));
   }
 
   template <class... Args>
     requires std::constructible_from<T, Args...> && (!has_stable_handles)
   constexpr void emplace(Args&&... args) {
-    do_push(std::forward<Args>(args)...);
+    push_value(std::forward<Args>(args)...);
   }
 
   /// Insert every element of @p range; the C++23 std::priority_queue
@@ -309,7 +309,7 @@ class priority_queue {
       Policy::make(mutable_span(), compare_);
     } else {
       for (auto&& value : range) {
-        unchecked_push(std::forward<decltype(value)>(value));
+        create_and_insert_node(std::forward<decltype(value)>(value));
       }
     }
   }
@@ -352,13 +352,13 @@ class priority_queue {
   constexpr void modify(point_iterator it, const T& value)
     requires has_stable_handles
   {
-    modify_impl(it, value);
+    replace_value_and_reinsert(it, value);
   }
 
   constexpr void modify(point_iterator it, T&& value)
     requires has_stable_handles
   {
-    modify_impl(it, std::move(value));
+    replace_value_and_reinsert(it, std::move(value));
   }
 
   /**
@@ -374,9 +374,9 @@ class priority_queue {
     CHAI_HARDENED(this != &other, "chaistl::priority_queue::join: self-join");
     CHAI_HARDENED(storage_.node_allocator() == other.storage_.node_allocator(),
                   "chaistl::priority_queue::join: allocators must compare equal");
-    node_type* stolen = std::exchange(other.storage_.root, nullptr);
+    node_type* transferred_root = std::exchange(other.storage_.root, nullptr);
     storage_.count += std::exchange(other.storage_.count, 0);
-    Policy::join(storage_.root, stolen, compare_);  // absorbs even on throw
+    Policy::join(storage_.root, transferred_root, compare_);  // absorbs even on throw
   }
 
   constexpr void swap(priority_queue& other) noexcept(std::is_nothrow_swappable_v<Compare>) {
@@ -419,7 +419,7 @@ class priority_queue {
   // bookkeeping must already include it. Only node creation itself may fail
   // without ownership having transferred.
   template <class... Args>
-  constexpr node_type* unchecked_push(Args&&... args)
+  constexpr node_type* create_and_insert_node(Args&&... args)
     requires(!uses_array_storage)
   {
     node_type* node = storage_.create(std::forward<Args>(args)...);
@@ -429,17 +429,17 @@ class priority_queue {
   }
 
   template <class... Args>
-  constexpr void do_push(Args&&... args) {
+  constexpr void push_value(Args&&... args) {
     if constexpr (uses_array_storage) {
       storage_.emplace_back(std::forward<Args>(args)...);
       Policy::push(mutable_span(), compare_);
     } else {
-      unchecked_push(std::forward<Args>(args)...);
+      create_and_insert_node(std::forward<Args>(args)...);
     }
   }
 
   template <class Arg>
-  constexpr void modify_impl(point_iterator it, Arg&& value) {
+  constexpr void replace_value_and_reinsert(point_iterator it, Arg&& value) {
     CHAI_HARDENED(it.node() != nullptr && !empty(), "chaistl::priority_queue::modify: invalid iterator");
     node_type* node = Policy::detach(it.node(), storage_.root, compare_);  // strong
     --storage_.count;

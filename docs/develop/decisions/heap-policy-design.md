@@ -41,7 +41,7 @@ backends are regular RAII values, the container's special members are
 **2. One node representation for every node policy.**
 Left-child/next-sibling with pb_ds's overloaded back edge
 (`prev_or_parent`): three pointers per node, every list doubly linked, and
-one uniform O(1) `splice_out` that works identically for a first child, a
+one uniform O(1) `unlink_from_list` that works identically for a first child, a
 middle sibling, and a root-list entry (`node.hpp`). The container-level
 invariant is always *forest* — a pairing heap is a forest of one tree — so
 destroy/clone/count/verify are shared, iterative (the back edges are the

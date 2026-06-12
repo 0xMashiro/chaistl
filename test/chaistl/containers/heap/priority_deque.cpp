@@ -45,6 +45,7 @@ TEST(PriorityDequeTest, PushTracksBothEnds) {
 
   for (int value : {4, 1, 7, 3, 9, 2}) {
     queue.push(value);
+    EXPECT_TRUE(queue.verify());
   }
 
   EXPECT_EQ(queue.size(), 6);
@@ -55,6 +56,7 @@ TEST(PriorityDequeTest, PushTracksBothEnds) {
 TEST(PriorityDequeTest, InitializerListBuildsValidMinMaxHeap) {
   chaistl::priority_deque<int> queue{8, 5, 1, 9, 2, 7, 3};
 
+  EXPECT_TRUE(queue.verify());
   EXPECT_EQ(drain_min(queue), (std::vector<int>{1, 2, 3, 5, 7, 8, 9}));
   EXPECT_EQ(drain_max(queue), (std::vector<int>{9, 8, 7, 5, 3, 2, 1}));
 }
@@ -63,13 +65,18 @@ TEST(PriorityDequeTest, PopMinAndPopMaxCanInterleave) {
   chaistl::priority_deque<int> queue{6, 2, 8, 1, 9, 3, 7, 4, 5};
 
   EXPECT_EQ(queue.min(), 1);
+  EXPECT_TRUE(queue.verify());
   queue.pop_min();
+  EXPECT_TRUE(queue.verify());
   EXPECT_EQ(queue.max(), 9);
   queue.pop_max();
+  EXPECT_TRUE(queue.verify());
   EXPECT_EQ(queue.min(), 2);
   EXPECT_EQ(queue.max(), 8);
   queue.pop_min();
+  EXPECT_TRUE(queue.verify());
   queue.pop_max();
+  EXPECT_TRUE(queue.verify());
 
   EXPECT_EQ(drain_min(queue), (std::vector<int>{3, 4, 5, 6, 7}));
 }
@@ -77,6 +84,7 @@ TEST(PriorityDequeTest, PopMinAndPopMaxCanInterleave) {
 TEST(PriorityDequeTest, ComparatorDefinesBothEnds) {
   chaistl::priority_deque<int, Flip> queue({1, 2, 3, 4}, Flip{false});
 
+  EXPECT_TRUE(queue.verify());
   EXPECT_EQ(queue.min(), 4);
   EXPECT_EQ(queue.max(), 1);
 }
@@ -85,8 +93,11 @@ TEST(PriorityDequeTest, EmplaceAndClear) {
   chaistl::priority_deque<std::string> queue;
 
   queue.emplace(3, 'c');
+  EXPECT_TRUE(queue.verify());
   queue.emplace(1, 'a');
+  EXPECT_TRUE(queue.verify());
   queue.emplace(2, 'b');
+  EXPECT_TRUE(queue.verify());
 
   EXPECT_EQ(queue.min(), "a");
   EXPECT_EQ(queue.max(), "ccc");
@@ -112,13 +123,16 @@ TEST(PriorityDequeTest, MatchesMultisetUnderRandomOperations) {
       EXPECT_EQ(queue.min(), *oracle.begin());
       queue.pop_min();
       oracle.erase(oracle.begin());
+      EXPECT_TRUE(queue.verify());
     } else {
       EXPECT_EQ(queue.max(), *oracle.rbegin());
       queue.pop_max();
       oracle.erase(std::prev(oracle.end()));
+      EXPECT_TRUE(queue.verify());
     }
 
     ASSERT_EQ(queue.size(), oracle.size());
+    EXPECT_TRUE(queue.verify());
     if (!oracle.empty()) {
       EXPECT_EQ(queue.min(), *oracle.begin());
       EXPECT_EQ(queue.max(), *oracle.rbegin());
