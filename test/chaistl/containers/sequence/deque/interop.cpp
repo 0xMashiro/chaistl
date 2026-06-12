@@ -10,11 +10,11 @@
 #include <gtest/gtest.h>
 
 #include <chaistl/containers/deque.hpp>
+#include <chaistl/memory_resource.hpp>
 
 #include <algorithm>
 #include <array>
 #include <compare>
-#include <memory_resource>
 #include <ranges>
 #include <type_traits>
 #include <vector>
@@ -39,12 +39,12 @@ TEST(DequeTest, FromRangeDeductionAndPmrAlias) {
   EXPECT_TRUE(std::ranges::equal(from_iterators, source));
   EXPECT_TRUE(std::ranges::equal(from_range, source));
 
-  std::pmr::monotonic_buffer_resource resource;
-  chaistl::pmr::deque<int> pmr_values{std::pmr::polymorphic_allocator<int>{&resource}};
+  auto* resource = chaistl::pmr::new_delete_resource();
+  chaistl::pmr::deque<int> pmr_values{chaistl::pmr::polymorphic_allocator<int>{resource}};
   pmr_values.append_range(source);
 
   EXPECT_TRUE(std::ranges::equal(pmr_values, source));
-  EXPECT_EQ(pmr_values.get_allocator().resource(), &resource);
+  EXPECT_EQ(pmr_values.get_allocator().resource(), resource);
 }
 
 TEST(DequeTest, Comparison) {

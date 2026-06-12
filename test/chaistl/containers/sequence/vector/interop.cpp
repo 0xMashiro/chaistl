@@ -11,11 +11,11 @@
 #include <gtest/gtest.h>
 
 #include <chaistl/containers/vector.hpp>
+#include <chaistl/memory_resource.hpp>
 
 #include <algorithm>
 #include <array>
 #include <compare>
-#include <memory_resource>
 #include <numeric>
 #include <ranges>
 #include <type_traits>
@@ -46,10 +46,11 @@ TEST(VectorTest, FromRangeDeductionAndPmrAlias) {
 
   EXPECT_TRUE(std::ranges::equal(values, std::array{1, 2, 3}));
 
-  std::pmr::monotonic_buffer_resource resource;
-  chaistl::pmr::vector<int> pmr_values{std::pmr::polymorphic_allocator<int>{&resource}};
+  auto* resource = chaistl::pmr::new_delete_resource();
+  chaistl::pmr::vector<int> pmr_values{chaistl::pmr::polymorphic_allocator<int>{resource}};
   pmr_values.push_back(42);
   EXPECT_EQ(pmr_values.front(), 42);
+  EXPECT_EQ(pmr_values.get_allocator().resource(), resource);
 }
 
 TEST(VectorTest, Comparison) {

@@ -487,29 +487,31 @@ class multiset {
 template <class InputIt,
           class Compare = std::less<std::iter_value_t<InputIt>>,
           class Allocator = allocator<std::iter_value_t<InputIt>>>
-  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Compare>) &&
-           concepts::qualifies_as_allocator<Allocator>
+  requires std::input_iterator<InputIt> &&
+               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
 multiset(InputIt, InputIt, Compare = Compare(), Allocator = Allocator())
     -> multiset<std::iter_value_t<InputIt>, Compare, Allocator>;
 
 template <class InputIt, class Allocator>
   requires std::input_iterator<InputIt> && concepts::qualifies_as_allocator<Allocator>
-multiset(InputIt, InputIt, Allocator)
-    -> multiset<std::iter_value_t<InputIt>, std::less<std::iter_value_t<InputIt>>, Allocator>;
+multiset(InputIt,
+         InputIt,
+         Allocator) -> multiset<std::iter_value_t<InputIt>, std::less<std::iter_value_t<InputIt>>, Allocator>;
 
 // Standard-style from_range deduction guides.
 template <class R,
           class Compare = std::less<std::ranges::range_value_t<R>>,
           class Allocator = allocator<std::ranges::range_value_t<R>>>
-  requires std::ranges::input_range<R> && (!concepts::qualifies_as_allocator<Compare>) &&
-           concepts::qualifies_as_allocator<Allocator>
+  requires std::ranges::input_range<R> &&
+               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
 multiset(std::from_range_t, R&&, Compare = Compare(), Allocator = Allocator())
     -> multiset<std::ranges::range_value_t<R>, Compare, Allocator>;
 
 template <class R, class Allocator>
   requires std::ranges::input_range<R> && concepts::qualifies_as_allocator<Allocator>
-multiset(std::from_range_t, R&&, Allocator)
-    -> multiset<std::ranges::range_value_t<R>, std::less<std::ranges::range_value_t<R>>, Allocator>;
+multiset(std::from_range_t,
+         R&&,
+         Allocator) -> multiset<std::ranges::range_value_t<R>, std::less<std::ranges::range_value_t<R>>, Allocator>;
 
 template <class Key, class Compare = std::less<Key>, class Allocator = allocator<Key>>
   requires(!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>

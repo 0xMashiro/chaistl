@@ -37,10 +37,10 @@
 #include <chaistl/memory/detail/lifetime/allocator_uninitialized.hpp>
 #include <chaistl/memory/detail/lifetime/exception_guard.hpp>
 #include <chaistl/memory/detail/storage/raw_storage_buffer.hpp>
+#include <chaistl/memory_resource.hpp>
 #include <chaistl/utility/hardening.hpp>
 
 #include <compare>
-#include <memory_resource>
 
 namespace chaistl {
 
@@ -1206,7 +1206,7 @@ deque(std::from_range_t, R&&, Allocator = Allocator()) -> deque<std::ranges::ran
 namespace pmr {
 
 template <concepts::container_element T>
-using deque = chaistl::deque<T, std::pmr::polymorphic_allocator<T>>;
+using deque = chaistl::deque<T, chaistl::pmr::polymorphic_allocator<T>>;
 
 }  // namespace pmr
 

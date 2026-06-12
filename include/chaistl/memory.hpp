@@ -3,3 +3,4 @@
 #pragma once
 
 #include <chaistl/memory/allocator.hpp>
+#include <chaistl/memory_resource.hpp>

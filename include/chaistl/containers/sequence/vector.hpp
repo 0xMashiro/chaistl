@@ -51,9 +51,8 @@
 #include <chaistl/memory/detail/lifetime/exception_guard.hpp>
 #include <chaistl/memory/detail/storage/uninitialized_storage_builder.hpp>
 #include <chaistl/memory/detail/utility/forward_like.hpp>
+#include <chaistl/memory_resource.hpp>
 #include <chaistl/utility/hardening.hpp>
-
-#include <memory_resource>
 
 namespace chaistl {
 
@@ -1145,7 +1144,7 @@ vector(std::from_range_t, R&&, Allocator = Allocator()) -> vector<std::ranges::r
 namespace pmr {
 
 template <concepts::container_element T>
-using vector = chaistl::vector<T, std::pmr::polymorphic_allocator<T>>;
+using vector = chaistl::vector<T, chaistl::pmr::polymorphic_allocator<T>>;
 
 }  // namespace pmr
 

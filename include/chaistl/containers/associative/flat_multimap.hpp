@@ -959,15 +959,17 @@ flat_multimap(sorted_equivalent_t, InputIt, InputIt, Compare = Compare())
     -> flat_multimap<detail::iter_key_t<InputIt>, detail::iter_mapped_t<InputIt>, Compare>;
 
 template <std::ranges::input_range R, class Compare = std::less<detail::range_key_t<R>>>
-flat_multimap(std::from_range_t, R&&, Compare = Compare())
-    -> flat_multimap<detail::range_key_t<R>, detail::range_mapped_t<R>, Compare>;
+flat_multimap(std::from_range_t,
+              R&&,
+              Compare = Compare()) -> flat_multimap<detail::range_key_t<R>, detail::range_mapped_t<R>, Compare>;
 
 template <class Key, class T, class Compare = std::less<Key>>
 flat_multimap(std::initializer_list<std::pair<Key, T>>, Compare = Compare()) -> flat_multimap<Key, T, Compare>;
 
 template <class Key, class T, class Compare = std::less<Key>>
-flat_multimap(sorted_equivalent_t, std::initializer_list<std::pair<Key, T>>, Compare = Compare())
-    -> flat_multimap<Key, T, Compare>;
+flat_multimap(sorted_equivalent_t,
+              std::initializer_list<std::pair<Key, T>>,
+              Compare = Compare()) -> flat_multimap<Key, T, Compare>;
 
 template <class Key, class T, class Compare, class KeyContainer, class MappedContainer>
 [[nodiscard]] constexpr bool operator==(const flat_multimap<Key, T, Compare, KeyContainer, MappedContainer>& lhs,
