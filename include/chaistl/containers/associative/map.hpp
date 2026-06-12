@@ -605,8 +605,8 @@ class map {
 template <class InputIt,
           class Compare = std::less<detail::set_map_deduction::iter_key_t<InputIt>>,
           class Allocator = allocator<detail::set_map_deduction::iter_alloc_t<InputIt>>>
-  requires std::input_iterator<InputIt> &&
-               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Compare>) &&
+           concepts::qualifies_as_allocator<Allocator>
 map(InputIt, InputIt, Compare = Compare(), Allocator = Allocator())
     -> map<detail::set_map_deduction::iter_key_t<InputIt>,
            detail::set_map_deduction::iter_mapped_t<InputIt>,
@@ -626,8 +626,8 @@ map(InputIt, InputIt, Allocator) -> map<detail::set_map_deduction::iter_key_t<In
 template <class R,
           class Compare = std::less<detail::set_map_deduction::range_key_t<R>>,
           class Allocator = allocator<detail::set_map_deduction::range_alloc_t<R>>>
-  requires std::ranges::input_range<R> &&
-               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::ranges::input_range<R> && (!concepts::qualifies_as_allocator<Compare>) &&
+           concepts::qualifies_as_allocator<Allocator>
 map(std::from_range_t, R&&, Compare = Compare(), Allocator = Allocator())
     -> map<detail::set_map_deduction::range_key_t<R>, detail::set_map_deduction::range_mapped_t<R>, Compare, Allocator>;
 
@@ -640,9 +640,8 @@ map(std::from_range_t, R&&, Allocator) -> map<detail::set_map_deduction::range_k
 
 template <class Key, class T, class Compare = std::less<Key>, class Allocator = allocator<std::pair<const Key, T>>>
   requires(!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
-map(std::initializer_list<std::pair<Key, T>>,
-    Compare = Compare(),
-    Allocator = Allocator()) -> map<Key, T, Compare, Allocator>;
+map(std::initializer_list<std::pair<Key, T>>, Compare = Compare(), Allocator = Allocator())
+    -> map<Key, T, Compare, Allocator>;
 
 template <class Key, class T, class Allocator>
   requires concepts::qualifies_as_allocator<Allocator>

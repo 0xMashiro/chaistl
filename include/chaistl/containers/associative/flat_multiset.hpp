@@ -628,13 +628,12 @@ class flat_multiset {
 };
 
 template <class KeyContainer, class Compare = std::less<typename KeyContainer::value_type>>
-flat_multiset(KeyContainer,
-              Compare = Compare()) -> flat_multiset<typename KeyContainer::value_type, Compare, KeyContainer>;
+flat_multiset(KeyContainer, Compare = Compare())
+    -> flat_multiset<typename KeyContainer::value_type, Compare, KeyContainer>;
 
 template <class KeyContainer, class Compare = std::less<typename KeyContainer::value_type>>
-flat_multiset(sorted_equivalent_t,
-              KeyContainer,
-              Compare = Compare()) -> flat_multiset<typename KeyContainer::value_type, Compare, KeyContainer>;
+flat_multiset(sorted_equivalent_t, KeyContainer, Compare = Compare())
+    -> flat_multiset<typename KeyContainer::value_type, Compare, KeyContainer>;
 
 template <std::input_iterator InputIt, class Compare = std::less<std::iter_value_t<InputIt>>>
 flat_multiset(InputIt, InputIt, Compare = Compare()) -> flat_multiset<std::iter_value_t<InputIt>, Compare>;

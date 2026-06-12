@@ -554,13 +554,13 @@ template <class InputIt,
           class Pred = std::equal_to<std::iter_value_t<InputIt>>,
           class Allocator = allocator<std::iter_value_t<InputIt>>>
   requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
-               (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
+           (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
 unordered_set(InputIt, InputIt, std::size_t = 0, Hash = Hash(), Pred = Pred(), Allocator = Allocator())
     -> unordered_set<std::iter_value_t<InputIt>, Hash, Pred, Allocator>;
 
 template <class T, class Hash = std::hash<T>, class Pred = std::equal_to<T>, class Allocator = allocator<T>>
   requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
-              (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
+          (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
 unordered_set(std::initializer_list<T>, std::size_t = 0, Hash = Hash(), Pred = Pred(), Allocator = Allocator())
     -> unordered_set<T, Hash, Pred, Allocator>;
 
@@ -572,20 +572,19 @@ unordered_set(InputIt, InputIt, std::size_t, Allocator) -> unordered_set<std::it
                                                                          Allocator>;
 
 template <class InputIt, class Hash, class Allocator>
-  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Hash>) &&
-               (!std::is_integral_v<Hash>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
+           concepts::qualifies_as_allocator<Allocator>
 unordered_set(InputIt, InputIt, std::size_t, Hash, Allocator)
     -> unordered_set<std::iter_value_t<InputIt>, Hash, std::equal_to<std::iter_value_t<InputIt>>, Allocator>;
 
 template <class T, class Allocator>
   requires concepts::qualifies_as_allocator<Allocator>
-unordered_set(std::initializer_list<T>,
-              std::size_t,
-              Allocator) -> unordered_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
+unordered_set(std::initializer_list<T>, std::size_t, Allocator)
+    -> unordered_set<T, std::hash<T>, std::equal_to<T>, Allocator>;
 
 template <class T, class Hash, class Allocator>
-  requires(!concepts::qualifies_as_allocator<Hash>) &&
-              (!std::is_integral_v<Hash>) && concepts::qualifies_as_allocator<Allocator>
+  requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
+          concepts::qualifies_as_allocator<Allocator>
 unordered_set(std::initializer_list<T>, std::size_t, Hash, Allocator)
     -> unordered_set<T, Hash, std::equal_to<T>, Allocator>;
 
@@ -594,7 +593,7 @@ template <std::ranges::input_range R,
           class Pred = std::equal_to<std::ranges::range_value_t<R>>,
           class Allocator = allocator<std::ranges::range_value_t<R>>>
   requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
-              (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
+          (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
 unordered_set(std::from_range_t, R&&, std::size_t = 0, Hash = Hash(), Pred = Pred(), Allocator = Allocator())
     -> unordered_set<std::ranges::range_value_t<R>, Hash, Pred, Allocator>;
 
@@ -607,8 +606,8 @@ unordered_set(std::from_range_t, R&&, std::size_t, Allocator)
                      Allocator>;
 
 template <std::ranges::input_range R, class Hash, class Allocator>
-  requires(!concepts::qualifies_as_allocator<Hash>) &&
-              (!std::is_integral_v<Hash>) && concepts::qualifies_as_allocator<Allocator>
+  requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
+          concepts::qualifies_as_allocator<Allocator>
 unordered_set(std::from_range_t, R&&, std::size_t, Hash, Allocator)
     -> unordered_set<std::ranges::range_value_t<R>, Hash, std::equal_to<std::ranges::range_value_t<R>>, Allocator>;
 

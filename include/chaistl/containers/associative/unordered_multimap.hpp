@@ -362,7 +362,7 @@ template <class InputIt,
           class Pred = std::equal_to<detail::set_map_deduction::iter_key_t<InputIt>>,
           class Allocator = allocator<detail::set_map_deduction::iter_alloc_t<InputIt>>>
   requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
-               (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
+           (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
 unordered_multimap(InputIt, InputIt, std::size_t = 0, Hash = Hash(), Pred = Pred(), Allocator = Allocator())
     -> unordered_multimap<detail::set_map_deduction::iter_key_t<InputIt>,
                           detail::set_map_deduction::iter_mapped_t<InputIt>,
@@ -376,12 +376,10 @@ template <class Key,
           class Pred = std::equal_to<Key>,
           class Allocator = allocator<std::pair<const Key, T>>>
   requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
-              (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
-unordered_multimap(std::initializer_list<std::pair<Key, T>>,
-                   std::size_t = 0,
-                   Hash = Hash(),
-                   Pred = Pred(),
-                   Allocator = Allocator()) -> unordered_multimap<Key, T, Hash, Pred, Allocator>;
+          (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
+unordered_multimap(
+    std::initializer_list<std::pair<Key, T>>, std::size_t = 0, Hash = Hash(), Pred = Pred(), Allocator = Allocator())
+    -> unordered_multimap<Key, T, Hash, Pred, Allocator>;
 
 template <class InputIt, class Allocator>
   requires std::input_iterator<InputIt> && concepts::qualifies_as_allocator<Allocator>
@@ -393,8 +391,8 @@ unordered_multimap(InputIt, InputIt, std::size_t, Allocator)
                           Allocator>;
 
 template <class InputIt, class Hash, class Allocator>
-  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Hash>) &&
-               (!std::is_integral_v<Hash>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
+           concepts::qualifies_as_allocator<Allocator>
 unordered_multimap(InputIt, InputIt, std::size_t, Hash, Allocator)
     -> unordered_multimap<detail::set_map_deduction::iter_key_t<InputIt>,
                           detail::set_map_deduction::iter_mapped_t<InputIt>,
@@ -404,13 +402,12 @@ unordered_multimap(InputIt, InputIt, std::size_t, Hash, Allocator)
 
 template <class Key, class T, class Allocator>
   requires concepts::qualifies_as_allocator<Allocator>
-unordered_multimap(std::initializer_list<std::pair<Key, T>>,
-                   std::size_t,
-                   Allocator) -> unordered_multimap<Key, T, std::hash<Key>, std::equal_to<Key>, Allocator>;
+unordered_multimap(std::initializer_list<std::pair<Key, T>>, std::size_t, Allocator)
+    -> unordered_multimap<Key, T, std::hash<Key>, std::equal_to<Key>, Allocator>;
 
 template <class Key, class T, class Hash, class Allocator>
-  requires(!concepts::qualifies_as_allocator<Hash>) &&
-              (!std::is_integral_v<Hash>) && concepts::qualifies_as_allocator<Allocator>
+  requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
+          concepts::qualifies_as_allocator<Allocator>
 unordered_multimap(std::initializer_list<std::pair<Key, T>>, std::size_t, Hash, Allocator)
     -> unordered_multimap<Key, T, Hash, std::equal_to<Key>, Allocator>;
 
@@ -419,7 +416,7 @@ template <std::ranges::input_range R,
           class Pred = std::equal_to<detail::set_map_deduction::range_key_t<R>>,
           class Allocator = allocator<detail::set_map_deduction::range_alloc_t<R>>>
   requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
-              (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
+          (!concepts::qualifies_as_allocator<Pred>) && concepts::qualifies_as_allocator<Allocator>
 unordered_multimap(std::from_range_t, R&&, std::size_t = 0, Hash = Hash(), Pred = Pred(), Allocator = Allocator())
     -> unordered_multimap<detail::set_map_deduction::range_key_t<R>,
                           detail::set_map_deduction::range_mapped_t<R>,
@@ -437,8 +434,8 @@ unordered_multimap(std::from_range_t, R&&, std::size_t, Allocator)
                           Allocator>;
 
 template <std::ranges::input_range R, class Hash, class Allocator>
-  requires(!concepts::qualifies_as_allocator<Hash>) &&
-              (!std::is_integral_v<Hash>) && concepts::qualifies_as_allocator<Allocator>
+  requires(!concepts::qualifies_as_allocator<Hash>) && (!std::is_integral_v<Hash>) &&
+          concepts::qualifies_as_allocator<Allocator>
 unordered_multimap(std::from_range_t, R&&, std::size_t, Hash, Allocator)
     -> unordered_multimap<detail::set_map_deduction::range_key_t<R>,
                           detail::set_map_deduction::range_mapped_t<R>,

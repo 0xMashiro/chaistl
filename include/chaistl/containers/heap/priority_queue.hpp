@@ -476,8 +476,8 @@ constexpr void swap(priority_queue<T, Compare, Allocator, Policy>& lhs,
 template <class InputIt,
           class Compare = std::less<std::iter_value_t<InputIt>>,
           class Allocator = allocator<std::iter_value_t<InputIt>>>
-  requires std::input_iterator<InputIt> &&
-               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Compare>) &&
+           concepts::qualifies_as_allocator<Allocator>
 priority_queue(InputIt, InputIt, Compare = Compare(), Allocator = Allocator())
     -> priority_queue<std::iter_value_t<InputIt>, Compare, Allocator>;
 
@@ -489,8 +489,8 @@ priority_queue(InputIt, InputIt, Allocator)
 template <class R,
           class Compare = std::less<std::ranges::range_value_t<R>>,
           class Allocator = allocator<std::ranges::range_value_t<R>>>
-  requires std::ranges::input_range<R> &&
-               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::ranges::input_range<R> && (!concepts::qualifies_as_allocator<Compare>) &&
+           concepts::qualifies_as_allocator<Allocator>
 priority_queue(std::from_range_t, R&&, Compare = Compare(), Allocator = Allocator())
     -> priority_queue<std::ranges::range_value_t<R>, Compare, Allocator>;
 

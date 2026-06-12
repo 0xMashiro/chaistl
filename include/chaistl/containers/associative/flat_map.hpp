@@ -1066,18 +1066,16 @@ flat_map(sorted_unique_t, KeyContainer, MappedContainer, Compare = Compare())
                 MappedContainer>;
 
 template <std::input_iterator InputIt, class Compare = std::less<detail::iter_key_t<InputIt>>>
-flat_map(InputIt,
-         InputIt,
-         Compare = Compare()) -> flat_map<detail::iter_key_t<InputIt>, detail::iter_mapped_t<InputIt>, Compare>;
+flat_map(InputIt, InputIt, Compare = Compare())
+    -> flat_map<detail::iter_key_t<InputIt>, detail::iter_mapped_t<InputIt>, Compare>;
 
 template <std::input_iterator InputIt, class Compare = std::less<detail::iter_key_t<InputIt>>>
 flat_map(sorted_unique_t, InputIt, InputIt, Compare = Compare())
     -> flat_map<detail::iter_key_t<InputIt>, detail::iter_mapped_t<InputIt>, Compare>;
 
 template <std::ranges::input_range R, class Compare = std::less<detail::range_key_t<R>>>
-flat_map(std::from_range_t,
-         R&&,
-         Compare = Compare()) -> flat_map<detail::range_key_t<R>, detail::range_mapped_t<R>, Compare>;
+flat_map(std::from_range_t, R&&, Compare = Compare())
+    -> flat_map<detail::range_key_t<R>, detail::range_mapped_t<R>, Compare>;
 
 template <class Key, class T, class Compare = std::less<Key>>
 flat_map(std::initializer_list<std::pair<Key, T>>, Compare = Compare()) -> flat_map<Key, T, Compare>;

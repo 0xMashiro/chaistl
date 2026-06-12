@@ -65,9 +65,8 @@ auto make_miss_keys(std::size_t count, miss_probe probe) -> std::vector<key_type
 }
 
 template <class Set>
-auto make_bucket_classified_miss_keys(const Set& set,
-                                      std::size_t count,
-                                      miss_bucket bucket_kind) -> std::vector<key_type> {
+auto make_bucket_classified_miss_keys(const Set& set, std::size_t count, miss_bucket bucket_kind)
+    -> std::vector<key_type> {
   std::vector<key_type> keys;
   keys.reserve(count);
 

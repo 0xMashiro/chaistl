@@ -666,9 +666,8 @@ template <class KeyContainer, class Compare = std::less<typename KeyContainer::v
 flat_set(KeyContainer, Compare = Compare()) -> flat_set<typename KeyContainer::value_type, Compare, KeyContainer>;
 
 template <class KeyContainer, class Compare = std::less<typename KeyContainer::value_type>>
-flat_set(sorted_unique_t,
-         KeyContainer,
-         Compare = Compare()) -> flat_set<typename KeyContainer::value_type, Compare, KeyContainer>;
+flat_set(sorted_unique_t, KeyContainer, Compare = Compare())
+    -> flat_set<typename KeyContainer::value_type, Compare, KeyContainer>;
 
 template <std::input_iterator InputIt, class Compare = std::less<std::iter_value_t<InputIt>>>
 flat_set(InputIt, InputIt, Compare = Compare()) -> flat_set<std::iter_value_t<InputIt>, Compare>;

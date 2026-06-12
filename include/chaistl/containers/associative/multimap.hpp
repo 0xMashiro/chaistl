@@ -499,8 +499,8 @@ class multimap {
 template <class InputIt,
           class Compare = std::less<detail::set_map_deduction::iter_key_t<InputIt>>,
           class Allocator = allocator<detail::set_map_deduction::iter_alloc_t<InputIt>>>
-  requires std::input_iterator<InputIt> &&
-               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::input_iterator<InputIt> && (!concepts::qualifies_as_allocator<Compare>) &&
+           concepts::qualifies_as_allocator<Allocator>
 multimap(InputIt, InputIt, Compare = Compare(), Allocator = Allocator())
     -> multimap<detail::set_map_deduction::iter_key_t<InputIt>,
                 detail::set_map_deduction::iter_mapped_t<InputIt>,
@@ -518,8 +518,8 @@ multimap(InputIt, InputIt, Allocator) -> multimap<detail::set_map_deduction::ite
 template <class R,
           class Compare = std::less<detail::set_map_deduction::range_key_t<R>>,
           class Allocator = allocator<detail::set_map_deduction::range_alloc_t<R>>>
-  requires std::ranges::input_range<R> &&
-               (!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
+  requires std::ranges::input_range<R> && (!concepts::qualifies_as_allocator<Compare>) &&
+           concepts::qualifies_as_allocator<Allocator>
 multimap(std::from_range_t, R&&, Compare = Compare(), Allocator = Allocator())
     -> multimap<detail::set_map_deduction::range_key_t<R>,
                 detail::set_map_deduction::range_mapped_t<R>,
@@ -535,9 +535,8 @@ multimap(std::from_range_t, R&&, Allocator) -> multimap<detail::set_map_deductio
 
 template <class Key, class T, class Compare = std::less<Key>, class Allocator = allocator<std::pair<const Key, T>>>
   requires(!concepts::qualifies_as_allocator<Compare>) && concepts::qualifies_as_allocator<Allocator>
-multimap(std::initializer_list<std::pair<Key, T>>,
-         Compare = Compare(),
-         Allocator = Allocator()) -> multimap<Key, T, Compare, Allocator>;
+multimap(std::initializer_list<std::pair<Key, T>>, Compare = Compare(), Allocator = Allocator())
+    -> multimap<Key, T, Compare, Allocator>;
 
 template <class Key, class T, class Allocator>
   requires concepts::qualifies_as_allocator<Allocator>
