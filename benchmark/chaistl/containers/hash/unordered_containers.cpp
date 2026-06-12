@@ -5,13 +5,16 @@
 //   tree or sorted contiguous buffer. Average-case insert, lookup, and erase
 //   are O(1), but constants depend heavily on hashing, load factor, bucket
 //   growth, and node/link locality.
-// - These benchmarks compare chaistl::unordered_set against
-//   std::unordered_set, and chaistl::unordered_map against std::unordered_map.
+// - These benchmarks compare the default prime policy against std and the
+//   opt-in power-of-two policy. The shifted/mixed hash cases make the policy
+//   trade-off visible: mask indexing is fast only when low hash bits are good.
 // - Rehash benchmarks compare reserve-then-insert against normal growth so the
 //   cost of avoiding incremental rehashes is visible at the same key scale.
 
 #include <chaistl/containers/unordered_map.hpp>
 #include <chaistl/containers/unordered_set.hpp>
+#include <chaistl/containers/power2_unordered_map.hpp>
+#include <chaistl/containers/power2_unordered_set.hpp>
 
 #include <algorithm>
 #include <benchmark/benchmark.h>
@@ -33,9 +36,32 @@ namespace {
 using key_type = int;
 using mapped_type = int;
 using chaistl_unordered_set = chaistl::unordered_set<key_type>;
+using chaistl_power2_unordered_set = chaistl::power2_unordered_set<key_type>;
 using std_unordered_set = std::unordered_set<key_type>;
 using chaistl_unordered_map = chaistl::unordered_map<key_type, mapped_type>;
+using chaistl_power2_unordered_map = chaistl::power2_unordered_map<key_type, mapped_type>;
 using std_unordered_map = std::unordered_map<key_type, mapped_type>;
+
+struct shifted_hash {
+  std::size_t operator()(key_type value) const noexcept { return static_cast<std::size_t>(value) << 8u; }
+};
+
+struct mixed_hash {
+  std::size_t operator()(key_type value) const noexcept {
+    std::size_t x = static_cast<std::size_t>(value);
+    x ^= x >> 16u;
+    x *= 0x7feb352dU;
+    x ^= x >> 15u;
+    x *= 0x846ca68bU;
+    x ^= x >> 16u;
+    return x;
+  }
+};
+
+using chaistl_shifted_unordered_set = chaistl::unordered_set<key_type, shifted_hash>;
+using chaistl_power2_shifted_unordered_set = chaistl::power2_unordered_set<key_type, shifted_hash>;
+using chaistl_mixed_unordered_set = chaistl::unordered_set<key_type, mixed_hash>;
+using chaistl_power2_mixed_unordered_set = chaistl::power2_unordered_set<key_type, mixed_hash>;
 
 std::vector<key_type> random_keys(std::size_t count, unsigned seed) {
   std::vector<key_type> keys(count);
@@ -269,6 +295,13 @@ void register_unordered_set_benchmarks(const char* container_name) {
   register_unordered_benchmark(container_name, "insert_no_reserve", &BM_UnorderedSet_Rehash<Set, false>);
 }
 
+template <class Set>
+void register_hash_quality_set_benchmarks(const char* container_name) {
+  register_unordered_benchmark(container_name, "lookup_hit", &BM_UnorderedSet_LookupHit<Set>);
+  register_unordered_benchmark(container_name, "lookup_miss", &BM_UnorderedSet_LookupMiss<Set>);
+  register_unordered_benchmark(container_name, "insert_reserved", &BM_UnorderedSet_Rehash<Set, true>);
+}
+
 template <class Map>
 void register_unordered_map_benchmarks(const char* container_name) {
   register_unordered_benchmark(container_name, "insert_random", &BM_UnorderedMap_InsertRandom<Map>);
@@ -282,9 +315,18 @@ void register_unordered_map_benchmarks(const char* container_name) {
 
 const int registered_unordered_benchmarks = [] {
   register_unordered_set_benchmarks<chaistl_unordered_set>("chaistl::unordered_set<int>");
+  register_unordered_set_benchmarks<chaistl_power2_unordered_set>("chaistl::power2_unordered_set<int>");
   register_unordered_set_benchmarks<std_unordered_set>("std::unordered_set<int>");
   register_unordered_map_benchmarks<chaistl_unordered_map>("chaistl::unordered_map<int,int>");
+  register_unordered_map_benchmarks<chaistl_power2_unordered_map>("chaistl::power2_unordered_map<int,int>");
   register_unordered_map_benchmarks<std_unordered_map>("std::unordered_map<int,int>");
+
+  register_hash_quality_set_benchmarks<chaistl_shifted_unordered_set>("chaistl::unordered_set<int,shifted_hash>");
+  register_hash_quality_set_benchmarks<chaistl_power2_shifted_unordered_set>(
+      "chaistl::power2_unordered_set<int,shifted_hash>");
+  register_hash_quality_set_benchmarks<chaistl_mixed_unordered_set>("chaistl::unordered_set<int,mixed_hash>");
+  register_hash_quality_set_benchmarks<chaistl_power2_mixed_unordered_set>(
+      "chaistl::power2_unordered_set<int,mixed_hash>");
   return 0;
 }();
 
