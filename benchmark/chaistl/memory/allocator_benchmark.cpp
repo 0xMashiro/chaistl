@@ -203,6 +203,38 @@ BENCHMARK(BM_PoolBatchAllocDealloc<chaistl::pmr::synchronized_pool_resource, cha
     ->Args({1024, 1})
     ->Args({1024, 8});
 
+static void BM_ChaistlPoolBatchAllocDeallocEagerRelease(benchmark::State& state) {
+  const auto allocation_count = static_cast<std::size_t>(state.range(0));
+  const auto object_count = static_cast<std::size_t>(state.range(1));
+  std::vector<int*> ptrs;
+  ptrs.reserve(allocation_count);
+
+  for (auto _ : state) {
+    chaistl::pmr::unsynchronized_pool_resource resource(
+        {.max_blocks_per_chunk = 0, .largest_required_pool_block = 0, .release_empty_chunks = true});
+    chaistl::pmr::polymorphic_allocator<int> alloc(&resource);
+
+    ptrs.clear();
+    for (std::size_t i = 0; i != allocation_count; ++i) {
+      int* pointer = alloc.allocate(object_count);
+      benchmark::DoNotOptimize(pointer);
+      ptrs.push_back(pointer);
+    }
+
+    for (int* pointer : ptrs) {
+      alloc.deallocate(pointer, object_count);
+    }
+  }
+
+  state.SetItemsProcessed(state.iterations() * allocation_count * object_count);
+}
+
+BENCHMARK(BM_ChaistlPoolBatchAllocDeallocEagerRelease)
+    ->Args({256, 1})
+    ->Args({256, 8})
+    ->Args({1024, 1})
+    ->Args({1024, 8});
+
 // =========================================================================
 // PMR-backed containers: allocator cost under real node workloads
 // =========================================================================

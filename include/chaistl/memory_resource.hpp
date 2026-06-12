@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -16,6 +17,18 @@
 
 namespace chaistl::pmr {
 
+namespace detail {
+
+constexpr bool is_power_of_two(std::size_t value) noexcept {
+  return value != 0 && (value & (value - 1)) == 0;
+}
+
+constexpr bool is_valid_alignment(std::size_t alignment) noexcept {
+  return is_power_of_two(alignment);
+}
+
+}  // namespace detail
+
 class memory_resource {
   static constexpr std::size_t max_align = alignof(std::max_align_t);
 
@@ -27,10 +40,16 @@ class memory_resource {
   memory_resource& operator=(const memory_resource&) = default;
 
   [[nodiscard]] void* allocate(std::size_t bytes, std::size_t alignment = max_align) {
+    if (!detail::is_valid_alignment(alignment)) [[unlikely]] {
+      throw std::bad_alloc();
+    }
     return do_allocate(bytes, alignment);
   }
 
   void deallocate(void* pointer, std::size_t bytes, std::size_t alignment = max_align) {
+    if (!detail::is_valid_alignment(alignment)) [[unlikely]] {
+      throw std::bad_alloc();
+    }
     do_deallocate(pointer, bytes, alignment);
   }
 
@@ -89,6 +108,56 @@ inline memory_resource* default_resource_storage(memory_resource* replacement = 
   }
   return current.load(std::memory_order_acquire);
 }
+
+template <class Alloc>
+class resource_adaptor_impl final : public memory_resource {
+ public:
+  using allocator_type = Alloc;
+  using traits_type = std::allocator_traits<allocator_type>;
+
+  static_assert(std::same_as<typename traits_type::pointer, typename allocator_type::value_type*>);
+  static_assert(std::same_as<typename traits_type::const_pointer, const typename allocator_type::value_type*>);
+  static_assert(std::same_as<typename traits_type::void_pointer, void*>);
+  static_assert(std::same_as<typename traits_type::const_void_pointer, const void*>);
+
+  resource_adaptor_impl() = default;
+  resource_adaptor_impl(const resource_adaptor_impl&) = default;
+  resource_adaptor_impl(resource_adaptor_impl&&) = default;
+
+  explicit resource_adaptor_impl(const allocator_type& allocator) : allocator_(allocator) {}
+  explicit resource_adaptor_impl(allocator_type&& allocator) : allocator_(std::move(allocator)) {}
+
+  resource_adaptor_impl& operator=(const resource_adaptor_impl&) = default;
+
+  [[nodiscard]] allocator_type get_allocator() const { return allocator_; }
+
+ private:
+  [[nodiscard]] static std::size_t allocation_count(std::size_t bytes) noexcept { return bytes == 0 ? 1 : bytes; }
+
+  void* do_allocate(std::size_t bytes, std::size_t) override {
+    const std::size_t count = allocation_count(bytes);
+    if (count > traits_type::max_size(allocator_)) [[unlikely]] {
+      throw std::bad_alloc();
+    }
+    return traits_type::allocate(allocator_, count);
+  }
+
+  void do_deallocate(void* pointer, std::size_t bytes, std::size_t) override {
+    traits_type::deallocate(
+        allocator_, static_cast<typename allocator_type::value_type*>(pointer), allocation_count(bytes));
+  }
+
+  bool do_is_equal(const memory_resource& other) const noexcept override {
+    const auto* that = dynamic_cast<const resource_adaptor_impl*>(&other);
+    try {
+      return that != nullptr && allocator_ == that->allocator_;
+    } catch (...) {
+      return false;
+    }
+  }
+
+  allocator_type allocator_{};
+};
 
 }  // namespace detail
 
@@ -202,9 +271,14 @@ template <class T1, class T2>
   return *lhs.resource() == *rhs.resource();
 }
 
+template <class Alloc>
+using resource_adaptor =
+    detail::resource_adaptor_impl<typename std::allocator_traits<Alloc>::template rebind_alloc<char>>;
+
 struct pool_options {
   std::size_t max_blocks_per_chunk = 0;
   std::size_t largest_required_pool_block = 0;
+  bool release_empty_chunks = false;
 };
 
 // Groups small allocations by rounded block size. Individual deallocations only
@@ -305,11 +379,16 @@ class unsynchronized_pool_resource : public memory_resource {
       return block;
     }
 
-    void deallocate(void* pointer) noexcept {
+    void deallocate(unsynchronized_pool_resource& owner, void* pointer) noexcept {
       pool_chunk* chunk = *chunk_slot(pointer);
+      ++chunk->free_count;
+      if (owner.options_.release_empty_chunks && chunk->free_count == chunk->capacity) {
+        release_chunk(owner.upstream_, chunk);
+        return;
+      }
+
       auto* block = ::new (pointer) free_block{chunk->free_list};
       chunk->free_list = block;
-      ++chunk->free_count;
       unfull_ = chunk;
     }
 
@@ -343,6 +422,27 @@ class unsynchronized_pool_resource : public memory_resource {
         }
       }
       return nullptr;
+    }
+
+    void release_chunk(memory_resource* upstream, pool_chunk* chunk) noexcept {
+      auto** link = &chunks_;
+      while (*link != nullptr && *link != chunk) {
+        link = &(*link)->next;
+      }
+      if (*link == nullptr) {
+        return;
+      }
+
+      *link = chunk->next;
+      if (unfull_ == chunk) {
+        unfull_ = nullptr;
+      }
+      upstream->deallocate(chunk, chunk->allocation_size, block_size_);
+      if (chunks_ == nullptr) {
+        next_capacity_ = default_next_capacity;
+      } else if (unfull_ == nullptr) {
+        unfull_ = find_unfull_chunk();
+      }
     }
 
     pool_chunk* allocate_chunk(unsynchronized_pool_resource& owner) {
@@ -422,7 +522,8 @@ class unsynchronized_pool_resource : public memory_resource {
     if (add_overflows(bytes, sizeof(pool_chunk*))) {
       throw std::bad_alloc();
     }
-    return bit_ceil(max_size(bytes + sizeof(pool_chunk*), alignment));
+    const std::size_t min_block_size = sizeof(free_block) + sizeof(pool_chunk*);
+    return bit_ceil(max_size(max_size(bytes + sizeof(pool_chunk*), min_block_size), alignment));
   }
 
   void* do_allocate(std::size_t bytes, std::size_t alignment) override {
@@ -434,7 +535,7 @@ class unsynchronized_pool_resource : public memory_resource {
 
   void do_deallocate(void* pointer, std::size_t bytes, std::size_t alignment) override {
     if (bytes <= options_.largest_required_pool_block) {
-      find_or_create_pool(block_size_for(bytes, alignment)).deallocate(pointer);
+      find_or_create_pool(block_size_for(bytes, alignment)).deallocate(*this, pointer);
       return;
     }
     deallocate_oversized(pointer);

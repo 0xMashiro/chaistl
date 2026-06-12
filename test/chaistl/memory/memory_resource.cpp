@@ -23,6 +23,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <new>
 #include <string>
@@ -63,6 +64,67 @@ class counting_resource final : public chaistl::pmr::memory_resource {
   bool do_is_equal(const chaistl::pmr::memory_resource& other) const noexcept override { return this == &other; }
 };
 
+class scoped_default_resource {
+ public:
+  explicit scoped_default_resource(chaistl::pmr::memory_resource* resource)
+      : previous_(chaistl::pmr::set_default_resource(resource)) {}
+
+  scoped_default_resource(const scoped_default_resource&) = delete;
+  scoped_default_resource& operator=(const scoped_default_resource&) = delete;
+
+  ~scoped_default_resource() { chaistl::pmr::set_default_resource(previous_); }
+
+ private:
+  chaistl::pmr::memory_resource* previous_;
+};
+
+struct tracking_allocator_state {
+  int allocations = 0;
+  int deallocations = 0;
+  std::size_t last_count = 0;
+};
+
+template <class T>
+class tracking_allocator {
+ public:
+  using value_type = T;
+
+  tracking_allocator() = default;
+  explicit tracking_allocator(tracking_allocator_state* state) noexcept : state_(state) {}
+
+  template <class U>
+  tracking_allocator(const tracking_allocator<U>& other) noexcept : state_(other.state()) {}
+
+  [[nodiscard]] T* allocate(std::size_t count) {
+    if (state_ != nullptr) {
+      ++state_->allocations;
+      state_->last_count = count;
+    }
+    return static_cast<T*>(::operator new(count * sizeof(T)));
+  }
+
+  void deallocate(T* pointer, std::size_t count) noexcept {
+    if (state_ != nullptr) {
+      ++state_->deallocations;
+      state_->last_count = count;
+    }
+    ::operator delete(pointer);
+  }
+
+  [[nodiscard]] tracking_allocator_state* state() const noexcept { return state_; }
+
+ private:
+  template <class>
+  friend class tracking_allocator;
+
+  tracking_allocator_state* state_ = nullptr;
+};
+
+template <class T, class U>
+[[nodiscard]] bool operator==(const tracking_allocator<T>& lhs, const tracking_allocator<U>& rhs) noexcept {
+  return lhs.state() == rhs.state();
+}
+
 struct uses_allocator_value {
   using allocator_type = chaistl::pmr::polymorphic_allocator<std::byte>;
 
@@ -98,6 +160,8 @@ static_assert(std::same_as<chaistl::pmr::unordered_set<int>::allocator_type, cha
 static_assert(std::same_as<chaistl::pmr::flat_map<int, int>::key_container_type, chaistl::pmr::vector<int>>);
 static_assert(std::same_as<chaistl::pmr::flat_map<int, int>::mapped_container_type, chaistl::pmr::vector<int>>);
 static_assert(std::same_as<chaistl::pmr::flat_set<int>::container_type, chaistl::pmr::vector<int>>);
+static_assert(
+    std::same_as<chaistl::pmr::resource_adaptor<tracking_allocator<int>>::allocator_type, tracking_allocator<char>>);
 
 TEST(MemoryResourceTest, DefaultResourceStartsAsNewDeleteResource) {
   auto* previous = chaistl::pmr::set_default_resource(nullptr);
@@ -129,6 +193,53 @@ TEST(MemoryResourceTest, NewDeleteResourceHandlesZeroSizeAndOverAlignedAllocatio
       chaistl::pmr::new_delete_resource()->allocate(sizeof(over_aligned_value), alignof(over_aligned_value));
   EXPECT_TRUE(is_aligned(aligned, alignof(over_aligned_value)));
   chaistl::pmr::new_delete_resource()->deallocate(aligned, sizeof(over_aligned_value), alignof(over_aligned_value));
+}
+
+TEST(MemoryResourceTest, MemoryResourcesRejectInvalidAlignment) {
+  alignas(std::max_align_t) std::byte buffer[128];
+  chaistl::pmr::monotonic_buffer_resource monotonic(buffer, sizeof(buffer));
+  chaistl::pmr::unsynchronized_pool_resource pool;
+
+  EXPECT_THROW((void)chaistl::pmr::new_delete_resource()->allocate(1, 0), std::bad_alloc);
+  EXPECT_THROW((void)monotonic.allocate(1, 3), std::bad_alloc);
+  EXPECT_THROW((void)pool.allocate(1, 6), std::bad_alloc);
+  EXPECT_THROW(chaistl::pmr::new_delete_resource()->deallocate(nullptr, 0, 0), std::bad_alloc);
+}
+
+TEST(MemoryResourceTest, MemoryResourcesRejectSizeOverflowPaths) {
+  chaistl::pmr::monotonic_buffer_resource monotonic(chaistl::pmr::null_memory_resource());
+  chaistl::pmr::unsynchronized_pool_resource pool({.max_blocks_per_chunk = 4, .largest_required_pool_block = 64},
+                                                  chaistl::pmr::null_memory_resource());
+  const std::size_t huge = std::numeric_limits<std::size_t>::max();
+
+  EXPECT_THROW((void)monotonic.allocate(huge, alignof(std::max_align_t)), std::bad_alloc);
+  EXPECT_THROW((void)pool.allocate(huge, alignof(std::max_align_t)), std::bad_alloc);
+}
+
+TEST(MemoryResourceTest, ResourceAdaptorWrapsAllocatorAsMemoryResource) {
+  tracking_allocator_state state;
+  chaistl::pmr::resource_adaptor<tracking_allocator<int>> resource{tracking_allocator<int>(&state)};
+
+  void* pointer = resource.allocate(24, alignof(int));
+  EXPECT_EQ(state.allocations, 1);
+  EXPECT_EQ(state.last_count, 24uz);
+
+  resource.deallocate(pointer, 24, alignof(int));
+  EXPECT_EQ(state.deallocations, 1);
+  EXPECT_EQ(state.last_count, 24uz);
+  EXPECT_EQ(resource.get_allocator().state(), &state);
+}
+
+TEST(MemoryResourceTest, ResourceAdaptorComparesWrappedAllocators) {
+  tracking_allocator_state state;
+  tracking_allocator_state other_state;
+  chaistl::pmr::resource_adaptor<tracking_allocator<int>> first{tracking_allocator<int>(&state)};
+  chaistl::pmr::resource_adaptor<tracking_allocator<long>> same{tracking_allocator<long>(&state)};
+  chaistl::pmr::resource_adaptor<tracking_allocator<int>> other{tracking_allocator<int>(&other_state)};
+
+  EXPECT_TRUE(first.is_equal(same));
+  EXPECT_FALSE(first.is_equal(other));
+  EXPECT_FALSE(first.is_equal(*chaistl::pmr::new_delete_resource()));
 }
 
 TEST(MemoryResourceTest, PolymorphicAllocatorUsesProvidedResource) {
@@ -280,6 +391,121 @@ TEST(MemoryResourceTest, PmrFlatAliasesForwardAllocatorToUnderlyingVectors) {
   EXPECT_EQ(multiset.keys().get_allocator().resource(), &resource);
 }
 
+TEST(MemoryResourceTest, PmrCopyConstructionUsesCurrentDefaultResource) {
+  counting_resource source_resource;
+  counting_resource default_resource;
+  scoped_default_resource guard(&default_resource);
+
+  chaistl::pmr::vector<int> vector{chaistl::pmr::polymorphic_allocator<int>(&source_resource)};
+  vector.push_back(1);
+  chaistl::pmr::vector<int> vector_copy(vector);
+  EXPECT_EQ(vector_copy.get_allocator().resource(), &default_resource);
+  EXPECT_EQ(vector_copy.front(), 1);
+
+  chaistl::pmr::list<int> list{chaistl::pmr::polymorphic_allocator<int>(&source_resource)};
+  list.push_back(2);
+  chaistl::pmr::list<int> list_copy(list);
+  EXPECT_EQ(list_copy.get_allocator().resource(), &default_resource);
+  EXPECT_EQ(list_copy.front(), 2);
+
+  chaistl::pmr::map<int, int> map{chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&source_resource)};
+  map.emplace(3, 30);
+  chaistl::pmr::map<int, int> map_copy(map);
+  EXPECT_EQ(map_copy.get_allocator().resource(), &default_resource);
+  EXPECT_EQ(map_copy.at(3), 30);
+
+  chaistl::pmr::unordered_map<int, int> unordered{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&source_resource)};
+  unordered.emplace(4, 40);
+  chaistl::pmr::unordered_map<int, int> unordered_copy(unordered);
+  EXPECT_EQ(unordered_copy.get_allocator().resource(), &default_resource);
+  EXPECT_EQ(unordered_copy.at(4), 40);
+
+  chaistl::pmr::flat_map<int, int> flat{chaistl::pmr::polymorphic_allocator<int>(&source_resource)};
+  flat.emplace(5, 50);
+  chaistl::pmr::flat_map<int, int> flat_copy(flat);
+  EXPECT_EQ(flat_copy.keys().get_allocator().resource(), &default_resource);
+  EXPECT_EQ(flat_copy.values().get_allocator().resource(), &default_resource);
+  EXPECT_EQ(flat_copy.at(5), 50);
+}
+
+TEST(MemoryResourceTest, PmrCopyAndMoveAssignmentPreserveTargetResource) {
+  counting_resource source_resource;
+  counting_resource target_resource;
+
+  chaistl::pmr::vector<int> vector_source{chaistl::pmr::polymorphic_allocator<int>(&source_resource)};
+  vector_source.push_back(1);
+  chaistl::pmr::vector<int> vector_target{chaistl::pmr::polymorphic_allocator<int>(&target_resource)};
+  vector_target = vector_source;
+  EXPECT_EQ(vector_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(vector_target.front(), 1);
+  vector_target = std::move(vector_source);
+  EXPECT_EQ(vector_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(vector_target.front(), 1);
+
+  chaistl::pmr::list<int> list_source{chaistl::pmr::polymorphic_allocator<int>(&source_resource)};
+  list_source.push_back(2);
+  chaistl::pmr::list<int> list_target{chaistl::pmr::polymorphic_allocator<int>(&target_resource)};
+  list_target = list_source;
+  EXPECT_EQ(list_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(list_target.front(), 2);
+  list_target = std::move(list_source);
+  EXPECT_EQ(list_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(list_target.front(), 2);
+
+  chaistl::pmr::map<int, int> map_source{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&source_resource)};
+  map_source.emplace(3, 30);
+  chaistl::pmr::map<int, int> map_target{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&target_resource)};
+  map_target = map_source;
+  EXPECT_EQ(map_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(map_target.at(3), 30);
+  map_target = std::move(map_source);
+  EXPECT_EQ(map_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(map_target.at(3), 30);
+
+  chaistl::pmr::unordered_map<int, int> unordered_source{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&source_resource)};
+  unordered_source.emplace(4, 40);
+  chaistl::pmr::unordered_map<int, int> unordered_target{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&target_resource)};
+  unordered_target = unordered_source;
+  EXPECT_EQ(unordered_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(unordered_target.at(4), 40);
+  unordered_target = std::move(unordered_source);
+  EXPECT_EQ(unordered_target.get_allocator().resource(), &target_resource);
+  EXPECT_EQ(unordered_target.at(4), 40);
+}
+
+TEST(MemoryResourceTest, PmrMoveConstructionWithAllocatorUsesRequestedResource) {
+  counting_resource source_resource;
+  counting_resource requested_resource;
+
+  chaistl::pmr::vector<int> vector_source{chaistl::pmr::polymorphic_allocator<int>(&source_resource)};
+  vector_source.push_back(1);
+  chaistl::pmr::vector<int> vector_moved(std::move(vector_source),
+                                         chaistl::pmr::polymorphic_allocator<int>(&requested_resource));
+  EXPECT_EQ(vector_moved.get_allocator().resource(), &requested_resource);
+  EXPECT_EQ(vector_moved.front(), 1);
+
+  chaistl::pmr::map<int, int> map_source{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&source_resource)};
+  map_source.emplace(2, 20);
+  chaistl::pmr::map<int, int> map_moved(
+      std::move(map_source), chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&requested_resource));
+  EXPECT_EQ(map_moved.get_allocator().resource(), &requested_resource);
+  EXPECT_EQ(map_moved.at(2), 20);
+
+  chaistl::pmr::unordered_map<int, int> unordered_source{
+      chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&source_resource)};
+  unordered_source.emplace(3, 30);
+  chaistl::pmr::unordered_map<int, int> unordered_moved(
+      std::move(unordered_source), chaistl::pmr::polymorphic_allocator<std::pair<const int, int>>(&requested_resource));
+  EXPECT_EQ(unordered_moved.get_allocator().resource(), &requested_resource);
+  EXPECT_EQ(unordered_moved.at(3), 30);
+}
+
 TEST(MemoryResourceTest, MonotonicBufferResourceUsesInitialBufferBeforeUpstream) {
   alignas(std::max_align_t) std::byte buffer[256];
   chaistl::pmr::monotonic_buffer_resource resource(buffer, sizeof(buffer), chaistl::pmr::null_memory_resource());
@@ -366,6 +592,39 @@ TEST(MemoryResourceTest, UnsynchronizedPoolResourceReusesReturnedBlocks) {
 
   EXPECT_EQ(first, second);
   alloc.deallocate(second, 1);
+}
+
+TEST(MemoryResourceTest, UnsynchronizedPoolResourceHandlesRepeatedZeroSizeAllocations) {
+  counting_resource upstream;
+  chaistl::pmr::unsynchronized_pool_resource resource({.max_blocks_per_chunk = 4, .largest_required_pool_block = 64},
+                                                      &upstream);
+
+  void* first = resource.allocate(0, alignof(char));
+  resource.deallocate(first, 0, alignof(char));
+  void* second = resource.allocate(0, alignof(char));
+
+  EXPECT_EQ(first, second);
+  resource.deallocate(second, 0, alignof(char));
+}
+
+TEST(MemoryResourceTest, UnsynchronizedPoolResourceCanReleaseEmptyChunksEagerly) {
+  counting_resource upstream;
+  chaistl::pmr::unsynchronized_pool_resource resource(
+      {.max_blocks_per_chunk = 4, .largest_required_pool_block = 64, .release_empty_chunks = true}, &upstream);
+  chaistl::pmr::polymorphic_allocator<int> alloc(&resource);
+  std::array<int*, 4> pointers{};
+
+  for (int*& pointer : pointers) {
+    pointer = alloc.allocate(1);
+  }
+  EXPECT_EQ(upstream.deallocations, 0);
+
+  for (int* pointer : pointers) {
+    alloc.deallocate(pointer, 1);
+  }
+
+  EXPECT_EQ(resource.options().release_empty_chunks, true);
+  EXPECT_EQ(upstream.deallocations, upstream.allocations);
 }
 
 TEST(MemoryResourceTest, UnsynchronizedPoolResourceHonorsOverAlignedSmallAllocations) {
