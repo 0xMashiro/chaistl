@@ -183,6 +183,30 @@ void bench_iterate_sum_with_policy(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * count);
 }
 
+template <class Set>
+void bench_clear_sparse_table(benchmark::State& state) {
+  const auto element_count = static_cast<std::size_t>(state.range(0));
+  const auto reserve_count = static_cast<std::size_t>(state.range(1));
+  const auto keys = make_keys(element_count, key_order::random);
+
+  for (auto _ : state) {
+    state.PauseTiming();
+    Set set;
+    set.reserve(reserve_count);
+    for (const key_type key : keys) {
+      set.insert(key);
+    }
+    state.counters["bucket_count"] = static_cast<double>(set.bucket_count());
+    state.counters["load_factor"] = set.load_factor();
+    state.ResumeTiming();
+
+    set.clear();
+    benchmark::DoNotOptimize(set);
+  }
+
+  state.SetItemsProcessed(state.iterations() * element_count);
+}
+
 void apply_iteration_diagnostic_args(benchmark::Benchmark* benchmark) {
   benchmark->Args({4096, 50})
       ->Args({4096, 100})
@@ -190,6 +214,14 @@ void apply_iteration_diagnostic_args(benchmark::Benchmark* benchmark) {
       ->Args({65536, 50})
       ->Args({65536, 100})
       ->Args({65536, 200})
+      ->Unit(benchmark::kNanosecond);
+}
+
+void apply_clear_sparse_args(benchmark::Benchmark* benchmark) {
+  benchmark->Args({64, 4096})
+      ->Args({64, 65536})
+      ->Args({1024, 65536})
+      ->Args({1024, 1048576})
       ->Unit(benchmark::kNanosecond);
 }
 
@@ -236,6 +268,10 @@ void register_iteration_diagnostics_for(std::string_view container_name) {
       container_name, "lookup_miss_empty_reserved");
   register_lookup_miss_bucket_diagnostic<Set, reserve_policy::reserve_first, miss_bucket::occupied>(
       container_name, "lookup_miss_occupied_reserved");
+
+  auto* clear_sparse = benchmark::RegisterBenchmark((std::string(container_name) + "/clear_sparse_reserved").c_str(),
+                                                    &bench_clear_sparse_table<Set>);
+  apply_clear_sparse_args(clear_sparse);
 }
 
 }  // namespace

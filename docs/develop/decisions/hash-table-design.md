@@ -16,6 +16,11 @@ counts, but ChaiSTL now also exposes opt-in power-of-two aliases as an
 extension. The default remains conservative because mask-based indexing depends
 on useful low hash bits.
 
+Updated 2026-06-12: sparse `clear()` now uses cached hash codes as a transient
+non-empty-bucket index. It resets only buckets that actually contain elements,
+then destroys the global node list, so `clear()` is O(size) even after a large
+`reserve()`/`rehash()`.
+
 ## Context
 
 `unordered_set` and `unordered_map` need a shared hash table core. The design
@@ -288,6 +293,10 @@ Unconditional in the first implementation. The honest reasons:
 - Explicitly *not* a reason in this layout: local-iterator traversal. Chains
   end at null; only the global-forward-list layouts need hash codes to detect
   bucket boundaries.
+- Sparse `clear()` uses cached hashes as a local bucket index: walking the
+  global list resets the bucket head for each live node before destroying
+  nodes. This captures the main benefit of a non-empty-bucket index for this
+  operation without adding persistent group metadata.
 - Caching does *not* extend across containers: node-handle reinsert and merge
   must recompute the hash with the destination's Hash, which may be a
   different stateful instance. (libstdc++ does the same; see Reference Notes.)

@@ -640,11 +640,13 @@ class hash_table {
 
   /// Destroys all elements; keeps the bucket array (capacity is retained).
   constexpr void clear() noexcept {
-    clear_nodes();
-    hash_node_base** bucket_heads = buckets();
-    for (size_type i = 0; i < bucket_count_; ++i) {
-      bucket_heads[i] = nullptr;
+    // Cached hashes identify exactly the buckets that currently contain
+    // elements, so sparse tables can clear in O(size()) instead of scanning a
+    // large mostly-empty bucket array.
+    for (hash_node_base* node = order_head_; node != nullptr; node = node->next_in_order) {
+      bucket_head_for(node->cached_hash) = nullptr;
     }
+    clear_nodes();
   }
 
   // ========================================================================
