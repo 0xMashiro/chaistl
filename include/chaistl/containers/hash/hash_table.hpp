@@ -815,11 +815,13 @@ class hash_table {
 
   [[nodiscard]] constexpr local_iterator end(size_type index) noexcept {
     CHAI_HARDENED(index < bucket_count_, "hash_table::end(n): index out of range");
+    (void)index;
     return local_iterator{};
   }
 
   [[nodiscard]] constexpr const_local_iterator end(size_type index) const noexcept {
     CHAI_HARDENED(index < bucket_count_, "hash_table::end(n): index out of range");
+    (void)index;
     return const_local_iterator{};
   }
 

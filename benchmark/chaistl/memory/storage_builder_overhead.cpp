@@ -3,6 +3,7 @@
 // Benchmark to measure the overhead of uninitialized_storage_builder
 // compared to direct allocator usage.
 
+#include <chaistl/memory/detail/lifetime/allocator_uninitialized.hpp>
 #include <chaistl/memory/detail/storage/uninitialized_storage_builder.hpp>
 
 #include <benchmark/benchmark.h>
@@ -72,7 +73,7 @@ void bench_storage_builder_default_construct(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * count);
 }
 
-// Direct allocator + uninitialized_allocator_default_construct_n
+// Direct allocator + allocator_uninitialized_default_construct_n
 template <class T>
 void bench_direct_default_construct(benchmark::State& state) {
   using allocator_type = std::allocator<T>;
@@ -83,7 +84,7 @@ void bench_direct_default_construct(benchmark::State& state) {
   for (auto _ : state) {
     allocator_type alloc;
     auto* first = allocator_traits::allocate(alloc, count);
-    auto* last = chaistl::detail::uninitialized_allocator_default_construct_n(alloc, first, count);
+    auto* last = chaistl::detail::allocator_uninitialized_default_construct_n(alloc, first, count);
     benchmark::DoNotOptimize(first);
     benchmark::DoNotOptimize(last);
     allocator_traits::deallocate(alloc, first, count);

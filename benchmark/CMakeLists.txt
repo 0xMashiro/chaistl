@@ -40,7 +40,7 @@ add_custom_target(
   VERBATIM
   USES_TERMINAL)
 
-set(CHAISTL_BENCHMARK_SMOKE_DOMAINS sequence tree_policy heap_policy flat bit_structure policy)
+set(CHAISTL_BENCHMARK_SMOKE_DOMAINS sequence algorithm tree_policy heap_policy flat bit_structure policy)
 foreach(domain IN LISTS CHAISTL_BENCHMARK_SMOKE_DOMAINS)
   add_custom_target(
     chaistl_benchmark_${domain}_smoke

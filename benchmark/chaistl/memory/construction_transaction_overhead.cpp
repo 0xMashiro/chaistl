@@ -77,7 +77,7 @@ BENCHMARK(BM_ConstructAtComplete<Tier2>);
 BENCHMARK(BM_ConstructAtComplete<Tier3>);
 
 // =========================================================================
-// B3: uninitialized_allocator_copy (trivially_destructible fast path)
+// B3: allocator_uninitialized_copy (trivially_destructible fast path)
 // =========================================================================
 
 template <class T>
@@ -88,7 +88,7 @@ static void BM_UAlgoCopy(benchmark::State& state) {
   std::vector<T> dst(n);
 
   for (auto _ : state) {
-    auto* r = chaistl::detail::uninitialized_allocator_copy(alloc, src.data(), src.data() + n, dst.data());
+    auto* r = chaistl::detail::allocator_uninitialized_copy(alloc, src.data(), src.data() + n, dst.data());
     benchmark::DoNotOptimize(r);
   }
   state.SetItemsProcessed(state.iterations() * n);
