@@ -11,6 +11,8 @@
 #include <utility>
 #include <vector>
 
+#include "../../sequence/support.hpp"
+
 namespace {
 
 using ::testing::ElementsAre;
@@ -37,6 +39,12 @@ using map_type = chaistl::flat_map<int,
                                    std::less<int>,
                                    chaistl::vector<int, tagged_allocator<int>>,
                                    chaistl::vector<std::string, tagged_allocator<std::string>>>;
+using propagating_map_type =
+    chaistl::flat_map<int,
+                      std::string,
+                      std::less<int>,
+                      chaistl::vector<int, chaistl::test::PropagatingAllocator<int>>,
+                      chaistl::vector<std::string, chaistl::test::PropagatingAllocator<std::string>>>;
 
 TEST(FlatMapAlloc, AllocatorExtendedDefaultConstruction) {
   map_type m(tagged_allocator<int>(7));
@@ -75,6 +83,46 @@ TEST(FlatMapAlloc, AllocatorExtendedSortedUniqueContainers) {
   EXPECT_EQ(m.keys().get_allocator().id, 5);
   EXPECT_TRUE(m.validate());
   EXPECT_EQ(m.at(3), "three");
+}
+
+TEST(FlatMapAlloc, CopyAssignmentHonorsUnderlyingAllocatorPropagation) {
+  map_type target({{9, "nine"}}, tagged_allocator<int>(1));
+  map_type source({{1, "one"}, {2, "two"}}, tagged_allocator<int>(2));
+
+  target = source;
+
+  EXPECT_EQ(target.keys().get_allocator().id, 1);
+  EXPECT_EQ(target.values().get_allocator().id, 1);
+  EXPECT_THAT(target.keys(), ElementsAre(1, 2));
+
+  propagating_map_type prop_target({{9, "nine"}}, chaistl::test::PropagatingAllocator<int>(3));
+  propagating_map_type prop_source({{4, "four"}}, chaistl::test::PropagatingAllocator<int>(4));
+
+  prop_target = prop_source;
+
+  EXPECT_EQ(prop_target.keys().get_allocator().id, 4);
+  EXPECT_EQ(prop_target.values().get_allocator().id, 4);
+  EXPECT_EQ(prop_target.at(4), "four");
+}
+
+TEST(FlatMapAlloc, SwapHonorsUnderlyingAllocatorPropagation) {
+  map_type lhs({{1, "one"}}, tagged_allocator<int>(1));
+  map_type rhs({{2, "two"}}, tagged_allocator<int>(1));
+
+  lhs.swap(rhs);
+
+  EXPECT_EQ(lhs.keys().get_allocator().id, 1);
+  EXPECT_EQ(lhs.values().get_allocator().id, 1);
+  EXPECT_EQ(lhs.at(2), "two");
+
+  propagating_map_type prop_lhs({{1, "one"}}, chaistl::test::PropagatingAllocator<int>(3));
+  propagating_map_type prop_rhs({{2, "two"}}, chaistl::test::PropagatingAllocator<int>(4));
+
+  prop_lhs.swap(prop_rhs);
+
+  EXPECT_EQ(prop_lhs.keys().get_allocator().id, 4);
+  EXPECT_EQ(prop_lhs.values().get_allocator().id, 4);
+  EXPECT_EQ(prop_lhs.at(2), "two");
 }
 
 }  // namespace

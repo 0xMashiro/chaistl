@@ -9,6 +9,8 @@
 #include <memory>
 #include <vector>
 
+#include "../../sequence/support.hpp"
+
 namespace {
 
 using ::testing::ElementsAre;
@@ -31,6 +33,8 @@ struct tagged_allocator {
 };
 
 using set_type = chaistl::flat_set<int, std::less<int>, chaistl::vector<int, tagged_allocator<int>>>;
+using propagating_set_type =
+    chaistl::flat_set<int, std::less<int>, chaistl::vector<int, chaistl::test::PropagatingAllocator<int>>>;
 
 TEST(FlatSetAlloc, AllocatorExtendedDefaultConstruction) {
   set_type s(tagged_allocator<int>(7));
@@ -65,6 +69,42 @@ TEST(FlatSetAlloc, AllocatorExtendedSortedUniqueContainer) {
 
   EXPECT_EQ(s.keys().get_allocator().id, 5);
   EXPECT_TRUE(s.validate());
+}
+
+TEST(FlatSetAlloc, CopyAssignmentHonorsUnderlyingAllocatorPropagation) {
+  set_type target({9}, tagged_allocator<int>(1));
+  set_type source({1, 2}, tagged_allocator<int>(2));
+
+  target = source;
+
+  EXPECT_EQ(target.keys().get_allocator().id, 1);
+  EXPECT_THAT(target, ElementsAre(1, 2));
+
+  propagating_set_type prop_target({9}, chaistl::test::PropagatingAllocator<int>(3));
+  propagating_set_type prop_source({4}, chaistl::test::PropagatingAllocator<int>(4));
+
+  prop_target = prop_source;
+
+  EXPECT_EQ(prop_target.keys().get_allocator().id, 4);
+  EXPECT_THAT(prop_target, ElementsAre(4));
+}
+
+TEST(FlatSetAlloc, SwapHonorsUnderlyingAllocatorPropagation) {
+  set_type lhs({1}, tagged_allocator<int>(1));
+  set_type rhs({2}, tagged_allocator<int>(1));
+
+  lhs.swap(rhs);
+
+  EXPECT_EQ(lhs.keys().get_allocator().id, 1);
+  EXPECT_THAT(lhs, ElementsAre(2));
+
+  propagating_set_type prop_lhs({1}, chaistl::test::PropagatingAllocator<int>(3));
+  propagating_set_type prop_rhs({2}, chaistl::test::PropagatingAllocator<int>(4));
+
+  prop_lhs.swap(prop_rhs);
+
+  EXPECT_EQ(prop_lhs.keys().get_allocator().id, 4);
+  EXPECT_THAT(prop_lhs, ElementsAre(2));
 }
 
 }  // namespace
