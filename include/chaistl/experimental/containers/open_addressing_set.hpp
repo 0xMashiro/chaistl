@@ -47,15 +47,13 @@
 namespace chaistl::experimental {
 
 struct linear_probing {
-  [[nodiscard]] static constexpr std::size_t offset(std::size_t, std::size_t probe,
-                                                    std::size_t) noexcept {
+  [[nodiscard]] static constexpr std::size_t offset(std::size_t, std::size_t probe, std::size_t) noexcept {
     return probe;
   }
 };
 
 struct quadratic_probing {
-  [[nodiscard]] static constexpr std::size_t offset(std::size_t, std::size_t probe,
-                                                    std::size_t) noexcept {
+  [[nodiscard]] static constexpr std::size_t offset(std::size_t, std::size_t probe, std::size_t) noexcept {
     // Triangular increments form a permutation modulo 2^n, so lookup can visit
     // every bucket while keeping the classic quadratic-probing shape.
     return probe * (probe + 1u) / 2u;
@@ -63,16 +61,18 @@ struct quadratic_probing {
 };
 
 struct double_hashing {
-  [[nodiscard]] static constexpr std::size_t offset(std::size_t hash, std::size_t probe,
-                                                    std::size_t) noexcept {
+  [[nodiscard]] static constexpr std::size_t offset(std::size_t hash, std::size_t probe, std::size_t) noexcept {
     constexpr std::size_t half_width = std::numeric_limits<std::size_t>::digits / 2u;
     const std::size_t step = (hash >> half_width) | 1u;
     return probe * step;
   }
 };
 
-template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>,
-          class ProbingPolicy = linear_probing, class Allocator = chaistl::allocator<Key>>
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class ProbingPolicy = linear_probing,
+          class Allocator = chaistl::allocator<Key>>
 class open_addressing_set {
   enum class slot_state : unsigned char { empty, occupied, tombstone };
 
@@ -162,8 +162,7 @@ class open_addressing_set {
     }
   }
 
-  constexpr open_addressing_set(std::initializer_list<value_type> init,
-                                const allocator_type& alloc = allocator_type{})
+  constexpr open_addressing_set(std::initializer_list<value_type> init, const allocator_type& alloc = allocator_type{})
       : open_addressing_set(alloc) {
     reserve(init.size());
     for (const auto& value : init) {
@@ -372,7 +371,8 @@ class open_addressing_set {
     return npos;
   }
 
-  [[nodiscard]] static constexpr size_type probe_index(std::size_t hash, size_type probe,
+  [[nodiscard]] static constexpr size_type probe_index(std::size_t hash,
+                                                       size_type probe,
                                                        size_type bucket_count) noexcept {
     return (hash + ProbingPolicy::offset(hash, probe, bucket_count)) & (bucket_count - 1u);
   }
@@ -403,19 +403,22 @@ class open_addressing_set {
   key_equal equal_{};
 };
 
-template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>,
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
           class Allocator = chaistl::allocator<Key>>
-using linear_open_addressing_set =
-    open_addressing_set<Key, Hash, KeyEqual, linear_probing, Allocator>;
+using linear_open_addressing_set = open_addressing_set<Key, Hash, KeyEqual, linear_probing, Allocator>;
 
-template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>,
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
           class Allocator = chaistl::allocator<Key>>
-using quadratic_open_addressing_set =
-    open_addressing_set<Key, Hash, KeyEqual, quadratic_probing, Allocator>;
+using quadratic_open_addressing_set = open_addressing_set<Key, Hash, KeyEqual, quadratic_probing, Allocator>;
 
-template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>,
+template <class Key,
+          class Hash = std::hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
           class Allocator = chaistl::allocator<Key>>
-using double_hashing_open_addressing_set =
-    open_addressing_set<Key, Hash, KeyEqual, double_hashing, Allocator>;
+using double_hashing_open_addressing_set = open_addressing_set<Key, Hash, KeyEqual, double_hashing, Allocator>;
 
 }  // namespace chaistl::experimental

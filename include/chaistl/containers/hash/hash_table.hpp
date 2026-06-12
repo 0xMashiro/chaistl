@@ -303,7 +303,7 @@ class hash_table {
       const key_type& key = key_of_value_(value);
       const std::size_t code = hasher_(key);
       const bool must_rehash = will_rehash_for_one_more();
-      const unique_insert_position position = find_unique_insert_position(code, key);
+      const unique_insert_position position = find_unique_insert_position(code, key, !must_rehash);
       if (position.existing != nullptr) {
         return {iterator(position.existing), false};
       }
@@ -313,7 +313,7 @@ class hash_table {
       });
       if (must_rehash) {
         reserve_for_one_more();
-        link_node(node, code);
+        link_node_at_bucket_head(node, code);
       } else {
         link_node_at_bucket_tail(node, code, position.tail_link);
       }
@@ -366,13 +366,13 @@ class hash_table {
     const key_type& key = key_of_value_(node->value);
     const std::size_t code = hasher_(key);
     const bool must_rehash = will_rehash_for_one_more();
-    const unique_insert_position position = find_unique_insert_position(code, key);
+    const unique_insert_position position = find_unique_insert_position(code, key, !must_rehash);
     if (position.existing != nullptr) {
       return {iterator(position.existing), false};
     }
     if (must_rehash) {
       reserve_for_one_more();
-      link_node(node, code);
+      link_node_at_bucket_head(node, code);
     } else {
       link_node_at_bucket_tail(node, code, position.tail_link);
     }
@@ -408,7 +408,7 @@ class hash_table {
   constexpr std::pair<iterator, bool> try_emplace_unique(K&& key, Args&&... args) {
     const std::size_t code = hasher_(key);
     const bool must_rehash = will_rehash_for_one_more();
-    const unique_insert_position position = find_unique_insert_position(code, key);
+    const unique_insert_position position = find_unique_insert_position(code, key, !must_rehash);
     if (position.existing != nullptr) {
       return {iterator(position.existing), false};
     }
@@ -420,7 +420,7 @@ class hash_table {
     });
     if (must_rehash) {
       reserve_for_one_more();
-      link_node(node, code);
+      link_node_at_bucket_head(node, code);
     } else {
       link_node_at_bucket_tail(node, code, position.tail_link);
     }
@@ -439,7 +439,7 @@ class hash_table {
   constexpr std::pair<iterator, bool> insert_transparent_unique(K&& key) {
     const std::size_t code = hasher_(key);
     const bool must_rehash = will_rehash_for_one_more();
-    const unique_insert_position position = find_unique_insert_position(code, key);
+    const unique_insert_position position = find_unique_insert_position(code, key, !must_rehash);
     if (position.existing != nullptr) {
       return {iterator(position.existing), false};
     }
@@ -449,7 +449,7 @@ class hash_table {
     });
     if (must_rehash) {
       reserve_for_one_more();
-      link_node(node, code);
+      link_node_at_bucket_head(node, code);
     } else {
       link_node_at_bucket_tail(node, code, position.tail_link);
     }
@@ -553,13 +553,13 @@ class hash_table {
     const key_type& key = key_of_value_(node->value);
     const std::size_t code = hasher_(key);
     const bool must_rehash = will_rehash_for_one_more();
-    const unique_insert_position position = find_unique_insert_position(code, key);
+    const unique_insert_position position = find_unique_insert_position(code, key, !must_rehash);
     if (position.existing != nullptr) {
       return {iterator(position.existing), false};
     }
     if (must_rehash) {
       reserve_for_one_more();  // throws: the handle still owns the node
-      link_node(node, code);
+      link_node_at_bucket_head(node, code);
     } else {
       link_node_at_bucket_tail(node, code, position.tail_link);
     }
@@ -605,12 +605,12 @@ class hash_table {
       const key_type& key = key_of_value_(typed->value);
       const std::size_t code = hasher_(key);
       const bool must_rehash = will_rehash_for_one_more();
-      const unique_insert_position position = find_unique_insert_position(code, key);
+      const unique_insert_position position = find_unique_insert_position(code, key, !must_rehash);
       if (position.existing == nullptr) {
         if (must_rehash) {
           reserve_for_one_more();  // throws: the node is still in source
           source.unlink_node(node);
-          link_node(typed, code);
+          link_node_at_bucket_head(typed, code);
         } else {
           source.unlink_node(node);
           link_node_at_bucket_tail(typed, code, position.tail_link);
@@ -1037,6 +1037,15 @@ class hash_table {
     ++size_;
   }
 
+  constexpr void link_node_at_bucket_head(table_node_type* node, std::size_t code) noexcept {
+    node->cached_hash = code;
+    hash_node_base*& head = bucket_head_for(code);
+    node->next_in_bucket = head;
+    head = node;
+    link_order_tail(node);
+    ++size_;
+  }
+
   constexpr void link_node_at_bucket_tail(table_node_type* node,
                                           std::size_t code,
                                           hash_node_base** tail_link) noexcept {
@@ -1174,10 +1183,13 @@ class hash_table {
   }
 
   // A unique insert miss can reuse the null link reached by lookup as the
-  // bucket insertion point. That link is only stable when the insert will not
-  // rehash; callers deliberately fall back to link_node() after growth.
+  // bucket insertion point. That link is only useful when the insert will not
+  // rehash; growth relinks every bucket, so callers can ask this lookup to
+  // skip tail-link bookkeeping and only detect duplicates.
   template <class K>
-  [[nodiscard]] constexpr unique_insert_position find_unique_insert_position(std::size_t code, const K& key) {
+  [[nodiscard]] constexpr unique_insert_position find_unique_insert_position(std::size_t code,
+                                                                             const K& key,
+                                                                             bool need_tail_link) {
     if (bucket_count_ == 0) {
       return {};
     }
@@ -1189,7 +1201,7 @@ class hash_table {
       }
       link = std::addressof(node->next_in_bucket);
     }
-    return {.tail_link = link};
+    return {.tail_link = need_tail_link ? link : nullptr};
   }
 
   /// Smallest bucket count b with `element_count <= max_load_factor() * b`.

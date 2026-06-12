@@ -118,8 +118,8 @@ TEST(OpenAddressingSet, IterationVisitsOccupiedElementsOnly) {
 }
 
 TEST(OpenAddressingSet, DoubleHashingUsesHighBitsForClusteredLowBits) {
-  using Set = chaistl::experimental::open_addressing_set<
-      int, ShiftedHash, std::equal_to<int>, chaistl::experimental::double_hashing>;
+  using Set = chaistl::experimental::
+      open_addressing_set<int, ShiftedHash, std::equal_to<int>, chaistl::experimental::double_hashing>;
   Set set;
 
   for (int value = 0; value < 200; ++value) {

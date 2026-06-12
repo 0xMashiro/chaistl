@@ -316,6 +316,7 @@ void register_hash_quality_set_benchmarks(const char* container_name) {
   register_unordered_benchmark(container_name, "lookup_hit", &BM_UnorderedSet_LookupHit<Set>);
   register_unordered_benchmark(container_name, "lookup_miss", &BM_UnorderedSet_LookupMiss<Set>);
   register_unordered_benchmark(container_name, "insert_reserved", &BM_UnorderedSet_Rehash<Set, true>);
+  register_unordered_benchmark(container_name, "insert_no_reserve", &BM_UnorderedSet_Rehash<Set, false>);
 }
 
 template <class Map>
