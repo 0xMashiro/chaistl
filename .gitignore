@@ -3,6 +3,7 @@ build*/
 .codex/
 compile_commands.json
 reference/
+benchmark/baselines/
 __pycache__/
 *.py[cod]
 
