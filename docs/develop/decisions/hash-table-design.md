@@ -576,6 +576,10 @@ Closed during the 2026-06-11 review (answers above):
 - Power-of-two rehash policy → shipped as opt-in aliases for the chained
   standard containers; still not the default because hash low-bit quality is a
   caller responsibility.
+- Open-addressing hash mixing → shipped as an experimental policy hook. The
+  default is identity, but `avalanche_hash_mix` lets power-of-two probing tables
+  demonstrate how a table can defend its index calculation from hashes with bad
+  low bits without changing the user's Hash object.
 - Transparent lookup staging → C++20 lookup in stage 2, C++23 erase/extract
   in stage 5, C++26 P2363 in stage 6.
 - Direct-chain layout permanence → kept, but with the explicit global

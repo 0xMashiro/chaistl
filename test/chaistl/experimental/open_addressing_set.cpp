@@ -132,6 +132,25 @@ TEST(OpenAddressingSet, DoubleHashingUsesHighBitsForClusteredLowBits) {
   EXPECT_TRUE(set.validate());
 }
 
+TEST(OpenAddressingSet, HashMixerRepairsClusteredLowBits) {
+  using Set = chaistl::experimental::open_addressing_set<int,
+                                                         ShiftedHash,
+                                                         std::equal_to<int>,
+                                                         chaistl::experimental::linear_probing,
+                                                         chaistl::allocator<int>,
+                                                         chaistl::experimental::avalanche_hash_mix>;
+  Set set;
+
+  for (int value = 0; value < 200; ++value) {
+    ASSERT_TRUE(set.insert(value).second);
+  }
+
+  for (int value = 0; value < 200; ++value) {
+    EXPECT_TRUE(set.contains(value));
+  }
+  EXPECT_TRUE(set.validate());
+}
+
 TEST(OpenAddressingSet, SupportsMoveOnlyValues) {
   using Set = chaistl::experimental::open_addressing_set<std::unique_ptr<int>>;
   static_assert(!std::is_copy_constructible_v<Set::value_type>);

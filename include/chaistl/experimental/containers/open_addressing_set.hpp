@@ -68,11 +68,36 @@ struct double_hashing {
   }
 };
 
+struct identity_hash_mix {
+  [[nodiscard]] static constexpr std::size_t mix(std::size_t hash) noexcept { return hash; }
+};
+
+struct avalanche_hash_mix {
+  [[nodiscard]] static constexpr std::size_t mix(std::size_t hash) noexcept {
+    if constexpr (std::numeric_limits<std::size_t>::digits > 32u) {
+      hash ^= hash >> 30u;
+      hash *= 0xbf58476d1ce4e5b9ULL;
+      hash ^= hash >> 27u;
+      hash *= 0x94d049bb133111ebULL;
+      hash ^= hash >> 31u;
+      return hash;
+    } else {
+      hash ^= hash >> 16u;
+      hash *= 0x7feb352dU;
+      hash ^= hash >> 15u;
+      hash *= 0x846ca68bU;
+      hash ^= hash >> 16u;
+      return hash;
+    }
+  }
+};
+
 template <class Key,
           class Hash = std::hash<Key>,
           class KeyEqual = std::equal_to<Key>,
           class ProbingPolicy = linear_probing,
-          class Allocator = chaistl::allocator<Key>>
+          class Allocator = chaistl::allocator<Key>,
+          class HashMix = identity_hash_mix>
 class open_addressing_set {
   enum class slot_state : unsigned char { empty, occupied, tombstone };
 
@@ -275,7 +300,7 @@ class open_addressing_set {
   template <class Value>
   constexpr std::pair<iterator, bool> insert_value(Value&& value) {
     ensure_insert_capacity();
-    const std::size_t hash = hash_(value);
+    const std::size_t hash = table_hash(value);
 
     size_type first_tombstone = npos;
     for (size_type probe = 0; probe < bucket_count(); ++probe) {
@@ -358,7 +383,7 @@ class open_addressing_set {
   [[nodiscard]] constexpr size_type find_index(const key_type& key) const {
     if (bucket_count() == 0) return npos;
 
-    const std::size_t hash = hash_(key);
+    const std::size_t hash = table_hash(key);
     for (size_type probe = 0; probe < bucket_count(); ++probe) {
       const size_type index = probe_index(hash, probe, bucket_count());
       const slot& bucket = slots_[index];
@@ -392,6 +417,11 @@ class open_addressing_set {
 
   [[nodiscard]] constexpr bool exceeds_load(size_type element_count, size_type buckets) const noexcept {
     return static_cast<float>(element_count) > max_load_factor_ * static_cast<float>(buckets);
+  }
+
+  template <class K>
+  [[nodiscard]] constexpr std::size_t table_hash(const K& key) const {
+    return HashMix::mix(hash_(key));
   }
 
   allocator_type allocator_{};
