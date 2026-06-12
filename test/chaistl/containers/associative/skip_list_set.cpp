@@ -72,6 +72,24 @@ struct TrackingAllocator {
   }
 };
 
+struct DirectionalCompare {
+  bool descending = false;
+
+  constexpr bool operator()(int lhs, int rhs) const noexcept {
+    return descending ? lhs > rhs : lhs < rhs;
+  }
+};
+
+struct ThrowingMoveCompare {
+  ThrowingMoveCompare() = default;
+  ThrowingMoveCompare(const ThrowingMoveCompare&) = default;
+  ThrowingMoveCompare(ThrowingMoveCompare&&) noexcept(false) {}
+
+  constexpr bool operator()(int lhs, int rhs) const noexcept { return lhs < rhs; }
+};
+
+static_assert(!std::is_nothrow_move_constructible_v<chaistl::skip_list_set<int, ThrowingMoveCompare>>);
+
 TEST(SkipListSetTest, InsertsUniqueKeysInOrder) {
   chaistl::skip_list_set<int> set;
 
@@ -127,6 +145,37 @@ TEST(SkipListSetTest, CopyMoveAndClear) {
 
   moved.clear();
   EXPECT_TRUE(moved.empty());
+}
+
+TEST(SkipListSetTest, MoveConstructWithAllocatorPreservesComparator) {
+  chaistl::skip_list_set<int, DirectionalCompare> set(DirectionalCompare{.descending = true});
+  set.insert(1);
+  set.insert(3);
+  set.insert(2);
+
+  chaistl::skip_list_set<int, DirectionalCompare> moved(std::move(set), set.get_allocator());
+
+  EXPECT_EQ(to_vector(moved), (std::vector<int>{3, 2, 1}));
+}
+
+TEST(SkipListSetTest, MoveAssignWithUnequalNonPropagatingAllocatorKeepsTargetAllocator) {
+  auto source_stats = std::make_shared<TrackingAllocatorStats>();
+  auto target_stats = std::make_shared<TrackingAllocatorStats>();
+
+  chaistl::skip_list_set<int, std::less<int>, TrackingAllocator<int>> source(std::less<int>{},
+                                                                             TrackingAllocator<int>{source_stats});
+  chaistl::skip_list_set<int, std::less<int>, TrackingAllocator<int>> target(std::less<int>{},
+                                                                             TrackingAllocator<int>{target_stats});
+  source.insert(1);
+  source.insert(3);
+  source.insert(2);
+  target.insert(9);
+
+  target = std::move(source);
+
+  EXPECT_EQ(target.get_allocator().stats, target_stats);
+  EXPECT_EQ(to_vector(target), (std::vector<int>{1, 2, 3}));
+  EXPECT_EQ(to_vector(source), (std::vector<int>{1, 2, 3}));
 }
 
 TEST(SkipListSetTest, MatchesStdSetUnderRandomOperations) {

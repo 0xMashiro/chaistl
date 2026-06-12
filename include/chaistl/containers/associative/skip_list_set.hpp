@@ -19,6 +19,7 @@
 #include <chaistl/concepts/allocator.hpp>
 #include <chaistl/concepts/container_element.hpp>
 #include <chaistl/memory/allocator.hpp>
+#include <chaistl/meta/type_traits.hpp>
 #include <chaistl/utility/hardening.hpp>
 
 #include <array>
@@ -159,7 +160,8 @@ class skip_list_set {
     insert(other.begin(), other.end());
   }
 
-  constexpr skip_list_set(skip_list_set&& other) noexcept
+  constexpr skip_list_set(skip_list_set&& other) noexcept(std::is_nothrow_move_constructible_v<Compare> &&
+                                                          std::is_nothrow_move_constructible_v<node_allocator>)
       : compare_(std::move(other.compare_)),
         alloc_(std::move(other.alloc_)),
         head_(std::move(other.head_)),
@@ -169,9 +171,14 @@ class skip_list_set {
     other.head_.fill(nullptr);
   }
 
-  constexpr skip_list_set(skip_list_set&& other, const std::type_identity_t<Allocator>& alloc) : skip_list_set(alloc) {
-    insert(std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
-    other.clear();
+  constexpr skip_list_set(skip_list_set&& other, const std::type_identity_t<Allocator>& alloc)
+      : skip_list_set(other.compare_, alloc) {
+    if (storage_compatible_with(other)) {
+      take_storage_from(other);
+    } else {
+      insert(std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
+      other.clear();
+    }
   }
 
   constexpr ~skip_list_set() { clear(); }
@@ -180,23 +187,38 @@ class skip_list_set {
     if (this == std::addressof(other)) {
       return *this;
     }
-    skip_list_set copy(other);
-    swap(copy);
+    if constexpr (meta::propagate_on_container_copy_assignment_v<node_allocator>) {
+      skip_list_set copy(other, other.get_allocator());
+      clear();
+      compare_ = other.compare_;
+      alloc_ = other.alloc_;
+      take_storage_from(copy);
+    } else {
+      skip_list_set copy(other, get_allocator());
+      swap(copy);
+    }
     return *this;
   }
 
-  constexpr skip_list_set& operator=(skip_list_set&& other) noexcept {
+  constexpr skip_list_set& operator=(skip_list_set&& other) noexcept(
+      (meta::propagate_on_container_move_assignment_v<node_allocator> ||
+       meta::allocator_is_always_equal_v<node_allocator>) &&
+      std::is_nothrow_move_assignable_v<Compare>) {
     if (this == std::addressof(other)) {
       return *this;
     }
     clear();
     compare_ = std::move(other.compare_);
-    alloc_ = std::move(other.alloc_);
-    head_ = std::move(other.head_);
-    size_ = std::exchange(other.size_, 0);
-    level_count_ = std::exchange(other.level_count_, 1);
-    rng_state_ = std::exchange(other.rng_state_, default_seed);
-    other.head_.fill(nullptr);
+    if constexpr (meta::propagate_on_container_move_assignment_v<node_allocator>) {
+      alloc_ = std::move(other.alloc_);
+      take_storage_from(other);
+    } else if constexpr (meta::allocator_is_always_equal_v<node_allocator>) {
+      take_storage_from(other);
+    } else if (storage_compatible_with(other)) {
+      take_storage_from(other);
+    } else {
+      insert(std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
+    }
     return *this;
   }
 
@@ -358,10 +380,13 @@ class skip_list_set {
   [[nodiscard]] constexpr key_compare key_comp() const { return compare_; }
   [[nodiscard]] constexpr value_compare value_comp() const { return compare_; }
 
-  constexpr void swap(skip_list_set& other) noexcept {
+  constexpr void swap(skip_list_set& other) noexcept(meta::is_nothrow_container_swappable_v<node_allocator> &&
+                                                     std::is_nothrow_swappable_v<Compare>) {
     using std::swap;
     swap(compare_, other.compare_);
-    swap(alloc_, other.alloc_);
+    if constexpr (meta::propagate_on_container_swap_v<node_allocator>) {
+      swap(alloc_, other.alloc_);
+    }
     swap(head_, other.head_);
     swap(size_, other.size_);
     swap(level_count_, other.level_count_);
@@ -382,8 +407,20 @@ class skip_list_set {
     return !compare_(lhs, rhs) && !compare_(rhs, lhs);
   }
 
+  [[nodiscard]] constexpr bool storage_compatible_with(const skip_list_set& other) const {
+    return alloc_ == other.alloc_;
+  }
+
+  constexpr void take_storage_from(skip_list_set& other) noexcept {
+    head_ = other.head_;
+    size_ = std::exchange(other.size_, 0);
+    level_count_ = std::exchange(other.level_count_, 1);
+    rng_state_ = std::exchange(other.rng_state_, default_seed);
+    other.head_.fill(nullptr);
+  }
+
   template <class... Args>
-  [[nodiscard]] constexpr node* make_node(std::size_t height, Args&&... args) {
+  [[nodiscard]] constexpr node* create_node(std::size_t height, Args&&... args) {
     link_allocator link_alloc(alloc_);
     node** links = link_traits::allocate(link_alloc, height);
     std::size_t constructed_links = 0;
@@ -511,7 +548,7 @@ class skip_list_set {
       update[level] = nullptr;
     }
 
-    node* inserted = make_node(height, std::forward<Value>(value));
+    node* inserted = create_node(height, std::forward<Value>(value));
     for (std::size_t level = 0; level < height; ++level) {
       inserted->next[level] = next_after(update[level], level);
       set_next_after(update[level], level, inserted);

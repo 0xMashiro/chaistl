@@ -5,10 +5,13 @@
 #include <chaistl/containers/skip_list_multiset.hpp>
 
 #include <algorithm>
+#include <cstddef>
 #include <functional>
+#include <memory>
 #include <random>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -23,6 +26,65 @@ std::vector<int> to_vector(const Set& set) {
   }
   return out;
 }
+
+struct DirectionalCompare {
+  bool descending = false;
+
+  constexpr bool operator()(int lhs, int rhs) const noexcept {
+    return descending ? lhs > rhs : lhs < rhs;
+  }
+};
+
+struct TrackingAllocatorStats {
+  std::size_t allocate_calls = 0;
+  std::size_t deallocate_calls = 0;
+  std::size_t allocated_objects = 0;
+  std::size_t deallocated_objects = 0;
+  std::size_t link_allocations = 0;
+};
+
+template <class T>
+struct TrackingAllocator {
+  using value_type = T;
+
+  std::shared_ptr<TrackingAllocatorStats> stats;
+
+  TrackingAllocator() : stats(std::make_shared<TrackingAllocatorStats>()) {}
+  explicit TrackingAllocator(std::shared_ptr<TrackingAllocatorStats> init) : stats(std::move(init)) {}
+
+  template <class U>
+  TrackingAllocator(const TrackingAllocator<U>& other) : stats(other.stats) {}
+
+  [[nodiscard]] T* allocate(std::size_t count) {
+    ++stats->allocate_calls;
+    stats->allocated_objects += count;
+    if constexpr (std::is_pointer_v<T>) {
+      ++stats->link_allocations;
+    }
+    return std::allocator<T>{}.allocate(count);
+  }
+
+  void deallocate(T* pointer, std::size_t count) noexcept {
+    ++stats->deallocate_calls;
+    stats->deallocated_objects += count;
+    std::allocator<T>{}.deallocate(pointer, count);
+  }
+
+  template <class U>
+  [[nodiscard]] bool operator==(const TrackingAllocator<U>& other) const noexcept {
+    return stats == other.stats;
+  }
+};
+
+struct ThrowingMoveCompare {
+  ThrowingMoveCompare() = default;
+  ThrowingMoveCompare(const ThrowingMoveCompare&) = default;
+  ThrowingMoveCompare(ThrowingMoveCompare&&) noexcept(false) {}
+
+  constexpr bool operator()(int lhs, int rhs) const noexcept { return lhs < rhs; }
+};
+
+static_assert(!std::is_nothrow_move_constructible_v<chaistl::skip_list_multiset<int, ThrowingMoveCompare>>);
 
 TEST(SkipListMultisetTest, InsertsEquivalentKeysAfterExistingRun) {
   chaistl::skip_list_multiset<int> set;
@@ -96,6 +158,33 @@ TEST(SkipListMultisetTest, CopyMoveAndClear) {
 
   moved.clear();
   EXPECT_TRUE(moved.empty());
+}
+
+TEST(SkipListMultisetTest, MoveConstructWithAllocatorPreservesComparator) {
+  chaistl::skip_list_multiset<int, DirectionalCompare> set(DirectionalCompare{.descending = true});
+  set.insert(1);
+  set.insert(3);
+  set.insert(2);
+  set.insert(3);
+
+  chaistl::skip_list_multiset<int, DirectionalCompare> moved(std::move(set), set.get_allocator());
+
+  EXPECT_EQ(to_vector(moved), (std::vector<int>{3, 3, 2, 1}));
+}
+
+TEST(SkipListMultisetTest, StatefulAllocatorOwnsNodeLinks) {
+  auto stats = std::make_shared<TrackingAllocatorStats>();
+  {
+    chaistl::skip_list_multiset<int, std::less<int>, TrackingAllocator<int>> set(std::less<int>{},
+                                                                                 TrackingAllocator<int>{stats});
+    for (int i = 0; i < 256; ++i) {
+      set.insert(i % 32);
+    }
+    ASSERT_EQ(stats->link_allocations, set.size());
+  }
+
+  EXPECT_EQ(stats->allocate_calls, stats->deallocate_calls);
+  EXPECT_EQ(stats->allocated_objects, stats->deallocated_objects);
 }
 
 TEST(SkipListMultisetTest, MatchesStdMultisetUnderRandomOperations) {
