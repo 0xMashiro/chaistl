@@ -48,6 +48,11 @@ class uninitialized_storage_builder {
     return transaction_.uninitialized_copy(first, last, result);
   }
 
+  template <class InputIt, class Size>
+  constexpr pointer uninitialized_copy_n(InputIt first, Size count, pointer result) {
+    return transaction_.uninitialized_copy_n(first, count, result);
+  }
+
   template <class InputIt>
   constexpr pointer uninitialized_move_if_noexcept(InputIt first, InputIt last, pointer result) {
     return transaction_.uninitialized_move_if_noexcept(first, last, result);

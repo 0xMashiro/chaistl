@@ -201,7 +201,7 @@ constexpr int ring_buffer_constexpr_smoke() {
   rb.push_back(3);
   rb.push_back(4);  // wraps: [2, 3, 4]
 
-  ring_buffer<int> copy(rb);  // exercises uninitialized_allocator_copy
+  ring_buffer<int> copy(rb);  // exercises allocator_uninitialized_copy
 
   int sum = 0;
   for (int v : copy) {

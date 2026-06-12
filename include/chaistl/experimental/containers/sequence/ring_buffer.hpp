@@ -273,7 +273,7 @@ class ring_buffer {
       data_ = allocator_traits::allocate(allocator_, count);
       capacity_ = count;
       size_ = count;
-      chaistl::detail::uninitialized_allocator_fill_n(allocator_, data_, count, value);
+      chaistl::detail::allocator_uninitialized_fill_n(allocator_, data_, count, value);
     }
   }
 
@@ -285,7 +285,7 @@ class ring_buffer {
       data_ = allocator_traits::allocate(allocator_, distance);
       capacity_ = distance;
       size_ = distance;
-      chaistl::detail::uninitialized_allocator_copy(allocator_, first, last, data_);
+      chaistl::detail::allocator_uninitialized_copy(allocator_, first, last, data_);
     }
   }
 
@@ -301,7 +301,7 @@ class ring_buffer {
         data_ = allocator_traits::allocate(allocator_, distance);
         capacity_ = distance;
         size_ = distance;
-        chaistl::detail::uninitialized_allocator_copy(
+        chaistl::detail::allocator_uninitialized_copy(
             allocator_, std::ranges::begin(range), std::ranges::end(range), data_);
       }
     } else {

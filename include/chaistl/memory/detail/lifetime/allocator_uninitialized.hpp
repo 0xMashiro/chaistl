@@ -70,7 +70,7 @@ constexpr void allocator_destroy_reverse(Allocator& allocator, Pointer first, Po
 }
 
 template <class Allocator, class InputIt, class Pointer>
-constexpr Pointer uninitialized_allocator_copy(Allocator& allocator, InputIt first, InputIt last, Pointer result) {
+constexpr Pointer allocator_uninitialized_copy(Allocator& allocator, InputIt first, InputIt last, Pointer result) {
   using value_type = std::remove_reference_t<decltype(*result)>;
 
   if constexpr (can_bulk_uninitialized_transfer_v<Allocator, InputIt, Pointer>) {
@@ -106,8 +106,32 @@ constexpr Pointer uninitialized_allocator_copy(Allocator& allocator, InputIt fir
   return current;
 }
 
+template <class Allocator, class InputIt, class Size, class Pointer>
+constexpr Pointer allocator_uninitialized_copy_n(Allocator& allocator, InputIt first, Size count, Pointer result) {
+  using value_type = std::remove_reference_t<decltype(*result)>;
+  using allocator_traits = std::allocator_traits<Allocator>;
+
+  if constexpr (std::is_trivially_destructible_v<value_type>) {
+    Pointer current = result;
+    for (Size index = 0; index < count; ++index, ++first, ++current) {
+      allocator_traits::construct(allocator, std::to_address(current), *first);
+    }
+    return current;
+  }
+
+  Pointer current = result;
+  auto guard = make_exception_guard([&] {
+    allocator_destroy_reverse(allocator, result, current);
+  });
+  for (Size index = 0; index < count; ++index, ++first, ++current) {
+    allocator_traits::construct(allocator, std::to_address(current), *first);
+  }
+  guard.complete();
+  return current;
+}
+
 template <class Allocator, class InputIt, class Pointer>
-constexpr Pointer uninitialized_allocator_move(Allocator& allocator, InputIt first, InputIt last, Pointer result) {
+constexpr Pointer allocator_uninitialized_move(Allocator& allocator, InputIt first, InputIt last, Pointer result) {
   using value_type = std::remove_reference_t<decltype(*result)>;
 
   if constexpr (can_bulk_uninitialized_transfer_v<Allocator, InputIt, Pointer>) {
@@ -142,7 +166,7 @@ constexpr Pointer uninitialized_allocator_move(Allocator& allocator, InputIt fir
 }
 
 template <class Allocator, class InputIt, class Pointer>
-constexpr Pointer uninitialized_allocator_move_if_noexcept(Allocator& allocator,
+constexpr Pointer allocator_uninitialized_move_if_noexcept(Allocator& allocator,
                                                            InputIt first,
                                                            InputIt last,
                                                            Pointer result) {
@@ -180,7 +204,7 @@ constexpr Pointer uninitialized_allocator_move_if_noexcept(Allocator& allocator,
 }
 
 template <class Allocator, class Pointer, class Size, class T>
-constexpr Pointer uninitialized_allocator_fill_n(Allocator& allocator, Pointer first, Size count, const T& value) {
+constexpr Pointer allocator_uninitialized_fill_n(Allocator& allocator, Pointer first, Size count, const T& value) {
   using value_type = std::remove_reference_t<decltype(*first)>;
 
   using allocator_traits = std::allocator_traits<Allocator>;
@@ -214,7 +238,7 @@ constexpr Pointer uninitialized_allocator_fill_n(Allocator& allocator, Pointer f
 }
 
 template <class Allocator, class Pointer, class Size>
-constexpr Pointer uninitialized_allocator_default_construct_n(Allocator& allocator, Pointer first, Size count) {
+constexpr Pointer allocator_uninitialized_default_construct_n(Allocator& allocator, Pointer first, Size count) {
   using value_type = std::remove_reference_t<decltype(*first)>;
 
   // Allocator-aware default insertion: construct each element as if by

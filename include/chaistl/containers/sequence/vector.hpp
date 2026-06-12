@@ -227,11 +227,10 @@ class vector {
   // C++23 ranges append.
   template <concepts::container_compatible_range<T> R>
   constexpr void append_range(R&& range) {
-    if constexpr (std::ranges::sized_range<R>) {
-      reserve(size() + static_cast<size_type>(std::ranges::size(range)));
-    }
-    for (auto&& value : range) {
-      emplace_back(std::forward<decltype(value)>(value));
+    if constexpr (std::ranges::forward_range<R> || std::ranges::sized_range<R>) {
+      append_counted_range(std::ranges::begin(range), static_cast<size_type>(std::ranges::distance(range)));
+    } else {
+      append_uncounted_range(std::ranges::begin(range), std::ranges::end(range));
     }
   }
   constexpr void pop_back() noexcept {
@@ -299,6 +298,10 @@ class vector {
   // In-place insertion.
   template <class... Args>
   constexpr iterator emplace_in_spare_capacity(size_type offset, Args&&... args);
+  template <std::input_iterator InputIt>
+  constexpr void append_counted_range(InputIt first, size_type count);
+  template <std::input_iterator InputIt, class Sentinel>
+  constexpr void append_uncounted_range(InputIt first, Sentinel last);
   template <std::input_iterator InputIt>
   constexpr pointer move_assign_if_noexcept(pointer target, InputIt first, InputIt last);
   constexpr iterator insert_fill_with_reallocation(size_type offset, size_type count, const T& value);
@@ -560,7 +563,7 @@ constexpr void vector<T, Allocator>::resize(size_type count) {
   }
 
   reserve(count);
-  last_ = detail::uninitialized_allocator_default_construct_n(allocator_, last_, count - size());
+  last_ = detail::allocator_uninitialized_default_construct_n(allocator_, last_, count - size());
 }
 
 template <concepts::container_element T, concepts::allocator_for<T> Allocator>
@@ -571,7 +574,7 @@ constexpr void vector<T, Allocator>::resize(size_type count, const T& value) {
   }
 
   reserve(count);
-  last_ = detail::uninitialized_allocator_fill_n(allocator_, last_, count - size(), value);
+  last_ = detail::allocator_uninitialized_fill_n(allocator_, last_, count - size(), value);
 }
 
 template <concepts::container_element T, concepts::allocator_for<T> Allocator>
@@ -647,6 +650,10 @@ template <concepts::container_compatible_range<T> R>
 constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_range(const_iterator position,
                                                                                      R&& range) {
   const size_type offset = offset_of(position);
+  if (offset == size()) {
+    append_range(std::forward<R>(range));
+    return begin() + static_cast<difference_type>(offset);
+  }
 
   vector inserted(std::from_range, std::forward<R>(range), allocator_);
   return insert_range_buffer(offset, inserted);
@@ -812,6 +819,48 @@ constexpr void vector<T, Allocator>::construct_at_end(Args&&... args) {
 
 template <concepts::container_element T, concepts::allocator_for<T> Allocator>
 template <std::input_iterator InputIt>
+constexpr void vector<T, Allocator>::append_counted_range(InputIt first, size_type count) {
+  if (count == 0) {
+    return;
+  }
+
+  const size_type old_size = size();
+  if (count > max_size() - old_size) {
+    throw std::length_error("chaistl::vector capacity exceeds max_size()");
+  }
+
+  if (count > capacity() - old_size) {
+    const size_type new_capacity = recommended_capacity(old_size + count);
+    detail::uninitialized_storage_builder<T, allocator_type> storage(allocator_, new_capacity);
+    pointer new_first = storage.data();
+
+    storage.uninitialized_copy_n(first, count, new_first + old_size);
+    storage.uninitialized_move_if_noexcept(first_, last_, new_first);
+
+    destroy_and_deallocate_storage();
+    first_ = storage.release();
+    last_ = first_ + old_size + count;
+    capacity_last_ = first_ + new_capacity;
+    return;
+  }
+
+  pointer constructed_last = last_;
+  detail::constructed_range_guard<allocator_type, pointer> guard(allocator_, last_, constructed_last);
+  constructed_last = detail::allocator_uninitialized_copy_n(allocator_, first, count, constructed_last);
+  guard.complete();
+  last_ = constructed_last;
+}
+
+template <concepts::container_element T, concepts::allocator_for<T> Allocator>
+template <std::input_iterator InputIt, class Sentinel>
+constexpr void vector<T, Allocator>::append_uncounted_range(InputIt first, Sentinel last) {
+  for (; first != last; ++first) {
+    emplace_back(*first);
+  }
+}
+
+template <concepts::container_element T, concepts::allocator_for<T> Allocator>
+template <std::input_iterator InputIt>
 constexpr typename vector<T, Allocator>::pointer vector<T, Allocator>::move_assign_if_noexcept(pointer target,
                                                                                                InputIt first,
                                                                                                InputIt last) {
@@ -898,7 +947,7 @@ constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_f
 
   if (suffix_count == 0) {
     // No suffix to shift: just construct new elements at the end.
-    last_ = detail::uninitialized_allocator_fill_n(allocator_, last_, count, inserted_value);
+    last_ = detail::allocator_uninitialized_fill_n(allocator_, last_, count, inserted_value);
     return begin() + static_cast<difference_type>(offset);
   }
 
@@ -910,7 +959,7 @@ constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_f
     pointer constructed_last = old_last;
     detail::constructed_range_guard<allocator_type, pointer> guard(allocator_, old_last, constructed_last);
     constructed_last =
-        detail::uninitialized_allocator_move_if_noexcept(allocator_, old_last - count, old_last, constructed_last);
+        detail::allocator_uninitialized_move_if_noexcept(allocator_, old_last - count, old_last, constructed_last);
     guard.complete();
     last_ = constructed_last;
     std::move_backward(position, old_last - count, old_last);
@@ -925,8 +974,8 @@ constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_f
   pointer constructed_last = old_last;
   detail::constructed_range_guard<allocator_type, pointer> guard(allocator_, old_last, constructed_last);
   constructed_last =
-      detail::uninitialized_allocator_fill_n(allocator_, constructed_last, count - suffix_count, inserted_value);
-  constructed_last = detail::uninitialized_allocator_move_if_noexcept(allocator_, position, old_last, constructed_last);
+      detail::allocator_uninitialized_fill_n(allocator_, constructed_last, count - suffix_count, inserted_value);
+  constructed_last = detail::allocator_uninitialized_move_if_noexcept(allocator_, position, old_last, constructed_last);
   guard.complete();
   last_ = constructed_last;
   std::fill(position, old_last, inserted_value);
@@ -979,7 +1028,7 @@ constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_r
 
   if (suffix_count == 0) {
     // No suffix: move-insert everything at the end.
-    last_ = detail::uninitialized_allocator_move_if_noexcept(allocator_, inserted.begin(), inserted.end(), last_);
+    last_ = detail::allocator_uninitialized_move_if_noexcept(allocator_, inserted.begin(), inserted.end(), last_);
     return begin() + static_cast<difference_type>(offset);
   }
 
@@ -988,7 +1037,7 @@ constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_r
     // but assign from the inserted range instead of filling.
     pointer constructed_last = old_last;
     detail::constructed_range_guard<allocator_type, pointer> guard(allocator_, old_last, constructed_last);
-    constructed_last = detail::uninitialized_allocator_move_if_noexcept(
+    constructed_last = detail::allocator_uninitialized_move_if_noexcept(
         allocator_, old_last - insert_count, old_last, constructed_last);
     guard.complete();
     last_ = constructed_last;
@@ -1005,8 +1054,8 @@ constexpr typename vector<T, Allocator>::iterator vector<T, Allocator>::insert_r
   auto inserted_tail = inserted.begin() + static_cast<difference_type>(suffix_count);
   detail::constructed_range_guard<allocator_type, pointer> guard(allocator_, old_last, constructed_last);
   constructed_last =
-      detail::uninitialized_allocator_move_if_noexcept(allocator_, inserted_tail, inserted.end(), constructed_last);
-  constructed_last = detail::uninitialized_allocator_move_if_noexcept(allocator_, position, old_last, constructed_last);
+      detail::allocator_uninitialized_move_if_noexcept(allocator_, inserted_tail, inserted.end(), constructed_last);
+  constructed_last = detail::allocator_uninitialized_move_if_noexcept(allocator_, position, old_last, constructed_last);
   guard.complete();
   last_ = constructed_last;
   move_assign_if_noexcept(position, inserted.begin(), inserted_tail);

@@ -106,7 +106,7 @@ TEST(UninitializedAllocatorAlgorithmsTest, CopyConstructsThroughAllocator) {
   tracked source[] = {tracked(1), tracked(2), tracked(3)};
   tracked* storage = allocator.allocate(3);
 
-  tracked* last = chaistl::detail::uninitialized_allocator_copy(allocator, source, source + 3, storage);
+  tracked* last = chaistl::detail::allocator_uninitialized_copy(allocator, source, source + 3, storage);
 
   EXPECT_EQ(last, storage + 3);
   EXPECT_EQ(counting_allocator<tracked>::constructs, 3);
@@ -128,7 +128,7 @@ TEST(UninitializedAllocatorAlgorithmsTest, CopyRollsBackConstructedElementsWhenC
   tracked* storage = allocator.allocate(3);
   tracked::copies_before_throw = 1;
 
-  EXPECT_THROW((void)chaistl::detail::uninitialized_allocator_copy(allocator, source, source + 3, storage),
+  EXPECT_THROW((void)chaistl::detail::allocator_uninitialized_copy(allocator, source, source + 3, storage),
                std::runtime_error);
   EXPECT_EQ(counting_allocator<tracked>::constructs, 2);
   EXPECT_EQ(counting_allocator<tracked>::destroys, 1);
@@ -144,8 +144,8 @@ TEST(UninitializedAllocatorAlgorithmsTest, FillAndDefaultConstructReturnPastTheC
   tracked* storage = allocator.allocate(4);
   tracked value(42);
 
-  tracked* middle = chaistl::detail::uninitialized_allocator_fill_n(allocator, storage, 2, value);
-  tracked* last = chaistl::detail::uninitialized_allocator_default_construct_n(allocator, middle, 2);
+  tracked* middle = chaistl::detail::allocator_uninitialized_fill_n(allocator, storage, 2, value);
+  tracked* last = chaistl::detail::allocator_uninitialized_default_construct_n(allocator, middle, 2);
 
   EXPECT_EQ(middle, storage + 2);
   EXPECT_EQ(last, storage + 4);
@@ -167,7 +167,7 @@ TEST(UninitializedAllocatorAlgorithmsTest, NonTrivialDefaultConstructorDoesNotUs
   counting_allocator<value_type> allocator;
   value_type* storage = allocator.allocate(2);
 
-  value_type* last = chaistl::detail::uninitialized_allocator_default_construct_n(allocator, storage, 2);
+  value_type* last = chaistl::detail::allocator_uninitialized_default_construct_n(allocator, storage, 2);
 
   EXPECT_EQ(last, storage + 2);
   EXPECT_EQ(counting_allocator<value_type>::constructs, 2);
@@ -185,7 +185,7 @@ TEST(UninitializedAllocatorAlgorithmsTest, TrivialCopyStillConstructsThroughCust
   int source[] = {1, 2, 3};
   int* storage = allocator.allocate(3);
 
-  int* last = chaistl::detail::uninitialized_allocator_copy(allocator, source, source + 3, storage);
+  int* last = chaistl::detail::allocator_uninitialized_copy(allocator, source, source + 3, storage);
 
   EXPECT_EQ(last, storage + 3);
   EXPECT_EQ(counting_allocator<int>::constructs, 3);
@@ -203,7 +203,7 @@ TEST(UninitializedAllocatorAlgorithmsTest, TrivialDefaultConstructionStillConstr
 
   int* storage = allocator.allocate(2);
 
-  int* last = chaistl::detail::uninitialized_allocator_default_construct_n(allocator, storage, 2);
+  int* last = chaistl::detail::allocator_uninitialized_default_construct_n(allocator, storage, 2);
 
   EXPECT_EQ(last, storage + 2);
   EXPECT_EQ(counting_allocator<int>::constructs, 2);
@@ -222,7 +222,7 @@ TEST(UninitializedAllocatorAlgorithmsTest, MoveIfNoexceptConstructsThroughAlloca
   tracked source[] = {tracked(7), tracked(8)};
   tracked* storage = allocator.allocate(2);
 
-  tracked* last = chaistl::detail::uninitialized_allocator_move_if_noexcept(allocator, source, source + 2, storage);
+  tracked* last = chaistl::detail::allocator_uninitialized_move_if_noexcept(allocator, source, source + 2, storage);
 
   EXPECT_EQ(last, storage + 2);
   EXPECT_EQ(counting_allocator<tracked>::constructs, 2);

@@ -112,9 +112,26 @@ class construction_transaction {
   template <class InputIt>
   constexpr Pointer uninitialized_copy(InputIt first, InputIt last, Pointer result) {
     if constexpr (is_trivially_copyable) {
-      return detail::uninitialized_allocator_copy(*allocator_, first, last, result);
+      return detail::allocator_uninitialized_copy(*allocator_, first, last, result);
     } else {
-      Pointer new_last = detail::uninitialized_allocator_copy(*allocator_, first, last, result);
+      Pointer new_last = detail::allocator_uninitialized_copy(*allocator_, first, last, result);
+      if constexpr (needs_rollback) {
+        push_range(result, new_last);
+      }
+      return new_last;
+    }
+  }
+
+  /**
+   * @brief Copy-construct @p count objects from @p first and register the
+   * constructed range.
+   */
+  template <class InputIt, class Size>
+  constexpr Pointer uninitialized_copy_n(InputIt first, Size count, Pointer result) {
+    if constexpr (is_trivially_copyable) {
+      return detail::allocator_uninitialized_copy_n(*allocator_, first, count, result);
+    } else {
+      Pointer new_last = detail::allocator_uninitialized_copy_n(*allocator_, first, count, result);
       if constexpr (needs_rollback) {
         push_range(result, new_last);
       }
@@ -129,9 +146,9 @@ class construction_transaction {
   template <class InputIt>
   constexpr Pointer uninitialized_move_if_noexcept(InputIt first, InputIt last, Pointer result) {
     if constexpr (is_trivially_copyable) {
-      return detail::uninitialized_allocator_move_if_noexcept(*allocator_, first, last, result);
+      return detail::allocator_uninitialized_move_if_noexcept(*allocator_, first, last, result);
     } else {
-      Pointer new_last = detail::uninitialized_allocator_move_if_noexcept(*allocator_, first, last, result);
+      Pointer new_last = detail::allocator_uninitialized_move_if_noexcept(*allocator_, first, last, result);
       if constexpr (needs_rollback) {
         push_range(result, new_last);
       }
@@ -146,9 +163,9 @@ class construction_transaction {
   template <class Size, class T>
   constexpr Pointer uninitialized_fill_n(Pointer first, Size count, const T& value) {
     if constexpr (is_trivially_copyable) {
-      return detail::uninitialized_allocator_fill_n(*allocator_, first, count, value);
+      return detail::allocator_uninitialized_fill_n(*allocator_, first, count, value);
     } else {
-      Pointer new_last = detail::uninitialized_allocator_fill_n(*allocator_, first, count, value);
+      Pointer new_last = detail::allocator_uninitialized_fill_n(*allocator_, first, count, value);
       if constexpr (needs_rollback) {
         push_range(first, new_last);
       }
@@ -163,9 +180,9 @@ class construction_transaction {
   template <class Size>
   constexpr Pointer uninitialized_default_construct_n(Pointer first, Size count) {
     if constexpr (is_trivially_copyable) {
-      return detail::uninitialized_allocator_default_construct_n(*allocator_, first, count);
+      return detail::allocator_uninitialized_default_construct_n(*allocator_, first, count);
     } else {
-      Pointer new_last = detail::uninitialized_allocator_default_construct_n(*allocator_, first, count);
+      Pointer new_last = detail::allocator_uninitialized_default_construct_n(*allocator_, first, count);
       if constexpr (needs_rollback) {
         push_range(first, new_last);
       }
