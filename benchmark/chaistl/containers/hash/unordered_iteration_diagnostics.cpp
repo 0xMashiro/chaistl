@@ -207,6 +207,27 @@ void bench_clear_sparse_table(benchmark::State& state) {
   state.SetItemsProcessed(state.iterations() * element_count);
 }
 
+template <class Set>
+void bench_insert_clear_cycles(benchmark::State& state) {
+  const auto element_count = static_cast<std::size_t>(state.range(0));
+  const auto cycle_count = static_cast<std::size_t>(state.range(1));
+  const auto keys = make_keys(element_count, key_order::random);
+
+  for (auto _ : state) {
+    Set set;
+    set.reserve(element_count);
+    for (std::size_t cycle = 0; cycle < cycle_count; ++cycle) {
+      for (const key_type key : keys) {
+        set.insert(key);
+      }
+      set.clear();
+    }
+    benchmark::DoNotOptimize(set);
+  }
+
+  state.SetItemsProcessed(state.iterations() * element_count * cycle_count);
+}
+
 void apply_iteration_diagnostic_args(benchmark::Benchmark* benchmark) {
   benchmark->Args({4096, 50})
       ->Args({4096, 100})
@@ -223,6 +244,10 @@ void apply_clear_sparse_args(benchmark::Benchmark* benchmark) {
       ->Args({1024, 65536})
       ->Args({1024, 1048576})
       ->Unit(benchmark::kNanosecond);
+}
+
+void apply_insert_clear_cycle_args(benchmark::Benchmark* benchmark) {
+  benchmark->Args({1024, 16})->Args({4096, 16})->Args({65536, 4})->Unit(benchmark::kNanosecond);
 }
 
 template <class Set, key_order Order, reserve_policy Reserve>
@@ -272,6 +297,10 @@ void register_iteration_diagnostics_for(std::string_view container_name) {
   auto* clear_sparse = benchmark::RegisterBenchmark((std::string(container_name) + "/clear_sparse_reserved").c_str(),
                                                     &bench_clear_sparse_table<Set>);
   apply_clear_sparse_args(clear_sparse);
+
+  auto* insert_clear = benchmark::RegisterBenchmark((std::string(container_name) + "/insert_clear_cycles").c_str(),
+                                                    &bench_insert_clear_cycles<Set>);
+  apply_insert_clear_cycle_args(insert_clear);
 }
 
 }  // namespace

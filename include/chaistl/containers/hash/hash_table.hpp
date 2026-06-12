@@ -640,13 +640,18 @@ class hash_table {
 
   /// Destroys all elements; keeps the bucket array (capacity is retained).
   constexpr void clear() noexcept {
-    // Cached hashes identify exactly the buckets that currently contain
-    // elements, so sparse tables can clear in O(size()) instead of scanning a
-    // large mostly-empty bucket array.
-    for (hash_node_base* node = order_head_; node != nullptr; node = node->next_in_order) {
-      bucket_head_for(node->cached_hash) = nullptr;
+    if (size_ < bucket_count_ / 2) {
+      // Cached hashes identify the buckets that currently contain elements.
+      // Use them only for sparse tables; dense tables are faster with one
+      // linear bucket-array pass than with one modulo per node.
+      clear_sparse_nodes();
+    } else {
+      hash_node_base** bucket_heads = buckets();
+      for (size_type i = 0; i < bucket_count_; ++i) {
+        bucket_heads[i] = nullptr;
+      }
+      clear_nodes();
     }
-    clear_nodes();
   }
 
   // ========================================================================
@@ -1259,6 +1264,19 @@ class hash_table {
     hash_node_base* node = order_head_;
     while (node != nullptr) {
       hash_node_base* next = node->next_in_order;
+      destroy_node(static_cast<table_node_type*>(node));
+      node = next;
+    }
+    order_head_ = nullptr;
+    order_tail_ = nullptr;
+    size_ = 0;
+  }
+
+  constexpr void clear_sparse_nodes() noexcept {
+    hash_node_base* node = order_head_;
+    while (node != nullptr) {
+      hash_node_base* next = node->next_in_order;
+      bucket_head_for(node->cached_hash) = nullptr;
       destroy_node(static_cast<table_node_type*>(node));
       node = next;
     }
