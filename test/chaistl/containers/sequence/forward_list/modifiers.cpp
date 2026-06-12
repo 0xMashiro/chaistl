@@ -141,6 +141,23 @@ TEST(ForwardListModifiers, InsertAfterCount) {
   EXPECT_EQ(*check++, 4);
 }
 
+TEST(ForwardListModifiers, InsertAfterCountAtTail) {
+  forward_list<int> fl = {1, 2};
+  auto tail = std::next(fl.begin());
+
+  auto it = fl.insert_after(tail, 3, 7);
+
+  EXPECT_EQ(*it, 7);
+  EXPECT_EQ(fl.size(), 5);
+  auto check = fl.begin();
+  EXPECT_EQ(*check++, 1);
+  EXPECT_EQ(*check++, 2);
+  EXPECT_EQ(*check++, 7);
+  EXPECT_EQ(*check++, 7);
+  EXPECT_EQ(*check++, 7);
+  EXPECT_EQ(check, fl.end());
+}
+
 TEST(ForwardListModifiers, InsertAfterRange) {
   forward_list<int> fl = {1, 4};
   int arr[] = {2, 3};

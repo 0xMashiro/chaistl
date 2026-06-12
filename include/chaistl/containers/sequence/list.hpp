@@ -227,7 +227,7 @@ class list {
   // =======================================================================
   // Storage ownership helpers
   // =======================================================================
-  constexpr void destroy_and_deallocate_all() noexcept {
+  constexpr void destroy_and_deallocate_nodes() noexcept {
     node_base* current = header_.next;
     while (current != &header_) {
       node_base* next = current->next;
@@ -252,7 +252,7 @@ class list {
   }
 
   constexpr void replace_storage_from(list& other) noexcept {
-    destroy_and_deallocate_all();
+    destroy_and_deallocate_nodes();
     take_storage_from(other);
   }
 
@@ -291,7 +291,7 @@ class list {
       : allocator_(alloc), node_allocator_(allocator_) {
     header_.init_self_referential();
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (size_type i = 0; i < count; ++i) {
       node_base* n = create_node();
@@ -305,7 +305,7 @@ class list {
       : allocator_(alloc), node_allocator_(allocator_) {
     header_.init_self_referential();
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (size_type i = 0; i < count; ++i) {
       node_base* n = create_node(value);
@@ -320,7 +320,7 @@ class list {
       : allocator_(alloc), node_allocator_(allocator_) {
     header_.init_self_referential();
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (; first != last; ++first) {
       node_base* n = create_node(*first);
@@ -338,7 +338,7 @@ class list {
         node_allocator_(allocator_) {
     header_.init_self_referential();
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (const auto& value : other) {
       node_base* n = create_node(value);
@@ -358,7 +358,7 @@ class list {
       : allocator_(alloc), node_allocator_(allocator_) {
     header_.init_self_referential();
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (const auto& value : other) {
       node_base* n = create_node(value);
@@ -375,7 +375,7 @@ class list {
       take_storage_from(other);
     } else {
       auto guard = detail::make_exception_guard([&] {
-        destroy_and_deallocate_all();
+        destroy_and_deallocate_nodes();
       });
       for (auto& value : other) {
         node_base* n = create_node(std::move(value));
@@ -391,7 +391,7 @@ class list {
       : allocator_(alloc), node_allocator_(allocator_) {
     header_.init_self_referential();
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (auto&& value : range) {
       node_base* n = create_node(std::forward<decltype(value)>(value));
@@ -401,7 +401,7 @@ class list {
     guard.complete();
   }
 
-  constexpr ~list() { destroy_and_deallocate_all(); }
+  constexpr ~list() { destroy_and_deallocate_nodes(); }
 
   constexpr list& operator=(const list& other);
 
@@ -588,7 +588,7 @@ class list {
     swap(size_, other.size_);
   }
 
-  constexpr void clear() noexcept { destroy_and_deallocate_all(); }
+  constexpr void clear() noexcept { destroy_and_deallocate_nodes(); }
 
   // =======================================================================
   // List operations
@@ -693,7 +693,7 @@ constexpr list<T, Allocator>& list<T, Allocator>::operator=(const list& other) {
   }
   if constexpr (meta::propagate_on_container_copy_assignment_v<allocator_type>) {
     list copy(other, other.get_allocator());
-    destroy_and_deallocate_all();
+    destroy_and_deallocate_nodes();
     copy_allocator_from(other);
     take_storage_from(copy);
   } else {
@@ -711,7 +711,7 @@ constexpr list<T, Allocator>& list<T, Allocator>::operator=(list&& other) noexce
   }
 
   if constexpr (meta::propagate_on_container_move_assignment_v<allocator_type>) {
-    destroy_and_deallocate_all();
+    destroy_and_deallocate_nodes();
     move_allocator_from(other);
     take_storage_from(other);
   } else if constexpr (meta::allocator_is_always_equal_v<allocator_type>) {

@@ -179,9 +179,9 @@ class forward_list {
   // =======================================================================
   // Node lifecycle
   // =======================================================================
-  constexpr void deallocate_node(node_type* nd) noexcept {
+  constexpr void deallocate_node(node_type* node) noexcept {
     using node_pointer = typename node_allocator_traits::pointer;
-    node_allocator_traits::deallocate(node_allocator_, std::pointer_traits<node_pointer>::pointer_to(*nd), 1);
+    node_allocator_traits::deallocate(node_allocator_, std::pointer_traits<node_pointer>::pointer_to(*node), 1);
   }
 
   template <class... Args>
@@ -197,8 +197,8 @@ class forward_list {
     return storage.release();
   }
 
-  constexpr void destroy_node(node_base* nd) noexcept {
-    auto* typed = static_cast<node_type*>(nd);
+  constexpr void destroy_node(node_base* node) noexcept {
+    auto* typed = static_cast<node_type*>(node);
     node_allocator_traits::destroy(node_allocator_, std::addressof(typed->value));
     std::destroy_at(typed);
     deallocate_node(typed);
@@ -226,7 +226,7 @@ class forward_list {
   // =======================================================================
   // Storage ownership helpers
   // =======================================================================
-  constexpr void destroy_and_deallocate_all() noexcept {
+  constexpr void destroy_and_deallocate_nodes() noexcept {
     node_base* current = before_begin_.next;
     while (current != nullptr) {
       node_base* next = current->next;
@@ -247,7 +247,7 @@ class forward_list {
   }
 
   constexpr void replace_storage_from(forward_list& other) noexcept {
-    destroy_and_deallocate_all();
+    destroy_and_deallocate_nodes();
     take_storage_from(other);
   }
 
@@ -271,9 +271,8 @@ class forward_list {
     }
   }
 
-  // Update last_ after a push_back-like operation.  Called when a node is
-  // appended as the new last element.
-  constexpr void update_last_after_push_back(node_base* new_last) noexcept {
+  // Link one detached node after the current tail and make it the new tail.
+  constexpr void link_back_node(node_base* new_last) noexcept {
     last_->next = new_last;
     last_ = new_last;
   }
@@ -293,11 +292,11 @@ class forward_list {
   explicit constexpr forward_list(size_type count, const allocator_type& alloc = allocator_type{})
       : allocator_(alloc), node_allocator_(allocator_) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (size_type i = 0; i < count; ++i) {
       node_base* n = create_node();
-      update_last_after_push_back(n);
+      link_back_node(n);
       ++size_;
     }
     guard.complete();
@@ -306,11 +305,11 @@ class forward_list {
   constexpr forward_list(size_type count, const T& value, const allocator_type& alloc = allocator_type{})
       : allocator_(alloc), node_allocator_(allocator_) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (size_type i = 0; i < count; ++i) {
       node_base* n = create_node(value);
-      update_last_after_push_back(n);
+      link_back_node(n);
       ++size_;
     }
     guard.complete();
@@ -320,11 +319,11 @@ class forward_list {
   constexpr forward_list(InputIt first, InputIt last, const allocator_type& alloc = allocator_type{})
       : allocator_(alloc), node_allocator_(allocator_) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (; first != last; ++first) {
       node_base* n = create_node(*first);
-      update_last_after_push_back(n);
+      link_back_node(n);
       ++size_;
     }
     guard.complete();
@@ -337,11 +336,11 @@ class forward_list {
       : allocator_(allocator_traits::select_on_container_copy_construction(other.allocator_)),
         node_allocator_(allocator_) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (const auto& value : other) {
       node_base* n = create_node(value);
-      update_last_after_push_back(n);
+      link_back_node(n);
       ++size_;
     }
     guard.complete();
@@ -355,11 +354,11 @@ class forward_list {
   constexpr forward_list(const forward_list& other, const std::type_identity_t<Allocator>& alloc)
       : allocator_(alloc), node_allocator_(allocator_) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (const auto& value : other) {
       node_base* n = create_node(value);
-      update_last_after_push_back(n);
+      link_back_node(n);
       ++size_;
     }
     guard.complete();
@@ -371,11 +370,11 @@ class forward_list {
       take_storage_from(other);
     } else {
       auto guard = detail::make_exception_guard([&] {
-        destroy_and_deallocate_all();
+        destroy_and_deallocate_nodes();
       });
       for (auto& value : other) {
         node_base* n = create_node(std::move(value));
-        update_last_after_push_back(n);
+        link_back_node(n);
         ++size_;
       }
       guard.complete();
@@ -386,17 +385,17 @@ class forward_list {
   constexpr forward_list(std::from_range_t, R&& range, const allocator_type& alloc = allocator_type{})
       : allocator_(alloc), node_allocator_(allocator_) {
     auto guard = detail::make_exception_guard([&] {
-      destroy_and_deallocate_all();
+      destroy_and_deallocate_nodes();
     });
     for (auto&& value : range) {
       node_base* n = create_node(std::forward<decltype(value)>(value));
-      update_last_after_push_back(n);
+      link_back_node(n);
       ++size_;
     }
     guard.complete();
   }
 
-  constexpr ~forward_list() { destroy_and_deallocate_all(); }
+  constexpr ~forward_list() { destroy_and_deallocate_nodes(); }
 
   constexpr forward_list& operator=(const forward_list& other);
 
@@ -467,7 +466,7 @@ class forward_list {
     check_size(size_ + 1);
     node_base* n = create_node(std::forward<Args>(args)...);
     if (empty()) {
-      update_last_after_push_back(n);
+      link_back_node(n);
     } else {
       link_after(&before_begin_, n, n);
     }
@@ -497,11 +496,10 @@ class forward_list {
     check_size(size_ + 1);
     node_base* pos = const_cast<node_base*>(position.node_);
     node_base* n = create_node(std::forward<Args>(args)...);
-    if (pos == last_ || pos->next == nullptr) {
-      // Inserting after the last element (or at end).
-      update_last_after_push_back(n);
-    } else {
-      link_after(pos, n, n);
+    const bool inserted_at_end = pos == last_ || pos->next == nullptr;
+    link_after(pos, n, n);
+    if (inserted_at_end) {
+      last_ = n;
     }
     ++size_;
     return iterator(n);
@@ -525,7 +523,7 @@ class forward_list {
   constexpr reference emplace_back(Args&&... args) {
     check_size(size_ + 1);
     node_base* n = create_node(std::forward<Args>(args)...);
-    update_last_after_push_back(n);
+    link_back_node(n);
     ++size_;
     return static_cast<node*>(last_)->value;
   }
@@ -559,7 +557,7 @@ class forward_list {
     }
   }
 
-  constexpr void clear() noexcept { destroy_and_deallocate_all(); }
+  constexpr void clear() noexcept { destroy_and_deallocate_nodes(); }
 
   // =======================================================================
   // Forward list operations
@@ -665,7 +663,7 @@ constexpr forward_list<T, Allocator>& forward_list<T, Allocator>::operator=(cons
   }
   if constexpr (meta::propagate_on_container_copy_assignment_v<allocator_type>) {
     forward_list copy(other, other.get_allocator());
-    destroy_and_deallocate_all();
+    destroy_and_deallocate_nodes();
     copy_allocator_from(other);
     take_storage_from(copy);
   } else {
@@ -683,7 +681,7 @@ constexpr forward_list<T, Allocator>& forward_list<T, Allocator>::operator=(forw
   }
 
   if constexpr (meta::propagate_on_container_move_assignment_v<allocator_type>) {
-    destroy_and_deallocate_all();
+    destroy_and_deallocate_nodes();
     move_allocator_from(other);
     take_storage_from(other);
   } else if constexpr (meta::allocator_is_always_equal_v<allocator_type>) {
@@ -781,9 +779,14 @@ template <concepts::container_element T, concepts::allocator_for<T> Allocator>
 constexpr void forward_list<T, Allocator>::resize(size_type count) {
   if (count > size_) {
     check_size(count);
+    const size_type old_size = size_;
     auto guard = detail::make_exception_guard([&] {
-      while (size_ > count) {
-        pop_front();
+      while (size_ > old_size) {
+        node_base* prev = &before_begin_;
+        while (prev->next != last_ && prev->next != nullptr) {
+          prev = prev->next;
+        }
+        erase_after(const_iterator(prev));
       }
     });
     while (size_ < count) {
@@ -813,9 +816,14 @@ template <concepts::container_element T, concepts::allocator_for<T> Allocator>
 constexpr void forward_list<T, Allocator>::resize(size_type count, const T& value) {
   if (count > size_) {
     check_size(count);
+    const size_type old_size = size_;
     auto guard = detail::make_exception_guard([&] {
-      while (size_ > count) {
-        pop_front();
+      while (size_ > old_size) {
+        node_base* prev = &before_begin_;
+        while (prev->next != last_ && prev->next != nullptr) {
+          prev = prev->next;
+        }
+        erase_after(const_iterator(prev));
       }
     });
     while (size_ < count) {
@@ -873,21 +881,11 @@ constexpr typename forward_list<T, Allocator>::iterator forward_list<T, Allocato
 
   guard.complete();
 
-  // Link into list after position.
   node_base* pos = const_cast<node_base*>(position.node_);
-  if (pos == last_ || pos->next == nullptr) {
-    // Inserting at end.
-    update_last_after_push_back(chain_last);
-    // But we also need to fix up if first != chain_last: chain was already built.
-    // For the "at end" case, pos->next is nullptr, so link_after sets
-    // chain_last->next = nullptr, pos->next = first.  But we also need to
-    // update last_ if pos was last_.
-    if (pos == last_) {
-      last_ = chain_last;
-    }
-    link_after(pos, first, chain_last);
-  } else {
-    link_after(pos, first, chain_last);
+  const bool inserted_at_end = pos == last_ || pos->next == nullptr;
+  link_after(pos, first, chain_last);
+  if (inserted_at_end) {
+    last_ = chain_last;
   }
   size_ += count;
   return iterator(first);
@@ -927,13 +925,10 @@ constexpr typename forward_list<T, Allocator>::iterator forward_list<T, Allocato
   guard.complete();
 
   node_base* pos = const_cast<node_base*>(position.node_);
-  if (pos == last_ || pos->next == nullptr) {
-    if (pos == last_) {
-      last_ = chain_last;
-    }
-    link_after(pos, chain_first, chain_last);
-  } else {
-    link_after(pos, chain_first, chain_last);
+  const bool inserted_at_end = pos == last_ || pos->next == nullptr;
+  link_after(pos, chain_first, chain_last);
+  if (inserted_at_end) {
+    last_ = chain_last;
   }
   size_ += count;
   return iterator(chain_first);
@@ -964,8 +959,8 @@ constexpr void forward_list<T, Allocator>::prepend_range(R&& range) {
   if (first == last) {
     return;
   }
-  // Build a temporary forward_list from the range, then splice_after before_begin.
-  forward_list temp;
+  // Build with this allocator; splice_after transfers nodes without rebinding.
+  forward_list temp(get_allocator());
   for (auto&& value : range) {
     temp.emplace_back(std::forward<decltype(value)>(value));
   }

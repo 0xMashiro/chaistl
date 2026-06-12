@@ -178,6 +178,20 @@ TEST(ForwardListAllocators, ExceptionSafetyEmplaceFrontRollback) {
   EXPECT_EQ(T::alive, 1);
 }
 
+TEST(ForwardListAllocators, ExceptionSafetyResizeGrowthRollback) {
+  using T = chaistl::test::ThrowOnDefault;
+  T::reset();
+
+  forward_list<T> fl;
+  fl.emplace_back(1);
+  fl.emplace_back(2);
+  T::defaults_before_throw = 1;  // resize constructs one new node, then throws.
+
+  EXPECT_THROW(fl.resize(5), std::runtime_error);
+  EXPECT_EQ(fl.size(), 2);
+  EXPECT_EQ(T::alive, 2);
+}
+
 // =======================================================================
 // check_size overflow (max_size exceeded)
 // =======================================================================
