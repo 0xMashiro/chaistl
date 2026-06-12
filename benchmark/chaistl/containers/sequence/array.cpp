@@ -14,6 +14,7 @@
 #include <string>
 
 #include "array_container_benchmarks.hpp"
+#include "chaistl/registry.hpp"
 
 namespace chaistl_benchmark {
 
@@ -39,5 +40,7 @@ void register_array_benchmarks() {
   register_array_type_benchmarks<movable_type>("movable_type");
   register_array_type_benchmarks<large_pod>("large_pod");
 }
+
+CHAISTL_REGISTER_BENCHMARK_FILE(register_array_benchmarks)
 
 }  // namespace chaistl_benchmark

@@ -29,6 +29,8 @@
 #include <utility>
 #include <vector>
 
+#include "chaistl/registry.hpp"
+
 namespace chaistl_benchmark {
 
 namespace {
@@ -288,5 +290,11 @@ void register_flat_container_benchmarks() {
   reg_mmap("bulk_insert", &bench_flat_multimap_bulk_insert);
   reg_mmap("single_insert", &bench_flat_multimap_single_insert);
 }
+
+CHAISTL_BENCHMARK_SMOKE_DOMAIN(flat,
+                               "^(flat_set|set_rb|set_std)/(insert_random|lookup_hit)/1024$|^flat_map/"
+                               "(bulk_insert|single_insert)/1024$|^(flat_multiset|multiset_rb|multiset_std)/"
+                               "(insert_random|lookup_hit)/1024$|^flat_multimap/(bulk_insert|single_insert)/1024$")
+CHAISTL_REGISTER_BENCHMARK_FILE(register_flat_container_benchmarks)
 
 }  // namespace chaistl_benchmark

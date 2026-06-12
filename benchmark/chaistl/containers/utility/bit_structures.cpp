@@ -23,6 +23,8 @@
 #include <string_view>
 #include <vector>
 
+#include "chaistl/registry.hpp"
+
 namespace chaistl_benchmark {
 
 namespace {
@@ -194,5 +196,12 @@ void register_bit_structure_benchmarks() {
   register_range_benchmark("chaistl::priority_deque/pop_minmax_random", &bench_priority_deque_pop_minmax_random);
   register_range_benchmark("std::multiset/pop_minmax_random", &bench_multiset_pop_minmax_random);
 }
+
+CHAISTL_BENCHMARK_SMOKE_DOMAIN(
+    bit_structure,
+    "^(std::bitset<4096>|chaistl::bitset<4096>)/(count_dense|bitwise_xor)$|^chaistl::dynamic_bitset/"
+    "(count_dense|find_next_sparse|bitwise_xor)/1024$|^(chaistl::priority_deque|std::multiset)/"
+    "(push_random|pop_minmax_random)/1024$")
+CHAISTL_REGISTER_BENCHMARK_FILE(register_bit_structure_benchmarks)
 
 }  // namespace chaistl_benchmark

@@ -8,6 +8,8 @@
 #include <benchmark/benchmark.h>
 #include <memory>
 
+#include "chaistl/registry.hpp"
+
 namespace chaistl_benchmark {
 
 // Baseline: direct allocator allocate + deallocate (no construction)
@@ -100,5 +102,7 @@ void register_storage_builder_benchmarks() {
   register_benchmark("storage_builder_default_construct<int>", bench_storage_builder_default_construct<int>);
   register_benchmark("direct_default_construct<int>", bench_direct_default_construct<int>);
 }
+
+CHAISTL_REGISTER_BENCHMARK_FILE(register_storage_builder_benchmarks)
 
 }  // namespace chaistl_benchmark

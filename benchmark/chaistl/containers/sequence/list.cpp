@@ -10,6 +10,7 @@
 #include <list>
 #include <string>
 
+#include "chaistl/registry.hpp"
 #include "sequence_container_benchmarks.hpp"
 
 namespace chaistl_benchmark {
@@ -349,5 +350,7 @@ void register_list_benchmarks() {
   register_list_container_benchmarks<std::list<large_pod>>("std::list<large_pod>");
   register_list_container_benchmarks<chaistl::list<large_pod>>("chaistl::list<large_pod>");
 }
+
+CHAISTL_REGISTER_BENCHMARK_FILE(register_list_benchmarks)
 
 }  // namespace chaistl_benchmark

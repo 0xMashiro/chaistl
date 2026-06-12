@@ -10,6 +10,7 @@
 #include <forward_list>
 #include <string>
 
+#include "chaistl/registry.hpp"
 #include "sequence_container_benchmarks.hpp"
 
 namespace chaistl_benchmark {
@@ -304,5 +305,7 @@ void register_forward_list_benchmarks() {
   register_forward_list_container_benchmarks<std::forward_list<large_pod>>("std::forward_list<large_pod>");
   register_forward_list_container_benchmarks<chaistl::forward_list<large_pod>>("chaistl::forward_list<large_pod>");
 }
+
+CHAISTL_REGISTER_BENCHMARK_FILE(register_forward_list_benchmarks)
 
 }  // namespace chaistl_benchmark

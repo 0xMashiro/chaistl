@@ -26,6 +26,8 @@
 #include <string_view>
 #include <vector>
 
+#include "chaistl/registry.hpp"
+
 namespace chaistl_benchmark {
 
 namespace {
@@ -164,5 +166,11 @@ void register_heap_policy_benchmarks() {
   register_meldable_heap_suite<leftist_heap>("heap_leftist");
   register_meldable_heap_suite<fibonacci_heap>("heap_fibonacci");
 }
+
+CHAISTL_BENCHMARK_SMOKE_DOMAIN(
+    heap_policy,
+    "^heap_(std|binary|dary4|pairing|binomial|skew|leftist|fibonacci)/(push_random|push_pop_random)/"
+    "1024$|^heap_(pairing|binomial|skew|leftist|fibonacci)/join_random/1024$")
+CHAISTL_REGISTER_BENCHMARK_FILE(register_heap_policy_benchmarks)
 
 }  // namespace chaistl_benchmark

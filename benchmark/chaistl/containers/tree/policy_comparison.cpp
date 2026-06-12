@@ -30,6 +30,8 @@
 #include <string_view>
 #include <vector>
 
+#include "chaistl/registry.hpp"
+
 namespace chaistl_benchmark {
 
 namespace {
@@ -296,5 +298,13 @@ void register_tree_policy_benchmarks() {
   register_policy_suite<std_set>("set_std");
   register_order_statistic_suite();
 }
+
+CHAISTL_BENCHMARK_SMOKE_DOMAIN(tree_policy,
+                               "^(set_(rb|avl|treap|splay|size_balanced|weight_balanced|skip_list|std)|multiset_skip_"
+                               "list)/(insert_random|lookup_hit|lookup_sequential_scan)/1024$")
+CHAISTL_BENCHMARK_SMOKE_DOMAIN(
+    order_statistic,
+    "^(order_statistic_set|set_size_balanced|set_weight_balanced|set_std)/(find_by_order|order_of_key)(_linear)?/1024$")
+CHAISTL_REGISTER_BENCHMARK_FILE(register_tree_policy_benchmarks)
 
 }  // namespace chaistl_benchmark

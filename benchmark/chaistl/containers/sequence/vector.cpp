@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "chaistl/registry.hpp"
 #include "sequence_container_benchmarks.hpp"
 
 namespace chaistl_benchmark {
@@ -69,5 +70,8 @@ void register_vector_benchmarks() {
   register_vector_specific_benchmarks<std::vector<bench::large_pod>>("std::vector<large_pod>");
   register_vector_specific_benchmarks<chaistl::vector<bench::large_pod>>("chaistl::vector<large_pod>");
 }
+
+CHAISTL_BENCHMARK_SMOKE_DOMAIN(sequence, "^(std|chaistl)::(deque|forward_list|list|vector)<int>/default_construct$")
+CHAISTL_REGISTER_BENCHMARK_FILE(register_vector_benchmarks)
 
 }  // namespace chaistl_benchmark

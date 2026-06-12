@@ -11,6 +11,7 @@
 #include <deque>
 #include <string>
 
+#include "chaistl/registry.hpp"
 #include "sequence_container_benchmarks.hpp"
 
 namespace chaistl_benchmark {
@@ -147,5 +148,7 @@ void register_deque_benchmarks() {
   register_deque_container_benchmarks<std::deque<large_pod>>("std::deque<large_pod>");
   register_deque_container_benchmarks<chaistl::deque<large_pod>>("chaistl::deque<large_pod>");
 }
+
+CHAISTL_REGISTER_BENCHMARK_FILE(register_deque_benchmarks)
 
 }  // namespace chaistl_benchmark

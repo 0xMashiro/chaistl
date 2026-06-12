@@ -143,3 +143,48 @@ build/gcc-benchmark/benchmark/chaistl_benchmarks \
 For serious numbers, run on an idle machine, pin CPU frequency when possible,
 and treat ASLR/load-average warnings as reasons to rerun before drawing
 conclusions.
+
+## Regression Workflow
+
+Use `scripts/benchmark_compare.py` for repeatable JSON runs and baseline
+comparison. It keeps Google Benchmark's human-readable console output while
+also writing the JSON result:
+
+```sh
+scripts/benchmark_compare.py run \
+  --filter='chaistl::vector<int>/default_construct' \
+  --repetitions 5 \
+  -o /tmp/vector-default.json
+```
+
+Save an accepted result as a dated baseline:
+
+```sh
+scripts/benchmark_compare.py save /tmp/vector-default.json --name clang22
+```
+
+Baseline files live under `benchmark/baselines/` and use
+`YYYY-MM-DD-<compiler><major>.json` names, for example
+`2026-06-12-clang22.json`. If the JSON context does not record the compiler,
+pass `--name` explicitly.
+
+For routine regression checks, compare a fresh temporary run against the latest
+baseline by filename:
+
+```sh
+scripts/benchmark_compare.py check \
+  --filter='chaistl::vector<int>/default_construct' \
+  --threshold 10 \
+  --repetitions 5
+```
+
+`compare` and `check` use `real_time` by default and report regressions when
+the contender is slower than the baseline by more than the threshold
+percentage. Improvements over the threshold are informational. Entries present
+in only one file are listed as unmatched and do not fail the comparison.
+
+Exit codes are:
+
+- `0`: no regressions over the threshold
+- `1`: at least one regression over the threshold
+- `2`: usage, file, or JSON format error
