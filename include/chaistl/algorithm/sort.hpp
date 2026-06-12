@@ -84,7 +84,10 @@ constexpr bool sort_equivalent(Compare& comp, const T& lhs, const U& rhs) {
 }
 
 template <std::random_access_iterator RandomIt, class Compare>
-constexpr std::pair<RandomIt, RandomIt> partition_around_pivot(RandomIt first, RandomIt pivot, RandomIt last, Compare& comp) {
+constexpr std::pair<RandomIt, RandomIt> partition_around_pivot(RandomIt first,
+                                                               RandomIt pivot,
+                                                               RandomIt last,
+                                                               Compare& comp) {
   RandomIt equal_first = pivot;
   RandomIt equal_last = pivot + 1;
 
@@ -325,7 +328,8 @@ constexpr void pdq_sort_loop(RandomIt first, RandomIt last, Compare& comp, int b
           std::iter_swap(last - 3, last - right_size / 4 - 2);
         }
       }
-    } else if (already_partitioned && partial_insertion_sort(first, pivot, comp) && partial_insertion_sort(pivot + 1, last, comp)) {
+    } else if (already_partitioned && partial_insertion_sort(first, pivot, comp) &&
+               partial_insertion_sort(pivot + 1, last, comp)) {
       return;
     }
 

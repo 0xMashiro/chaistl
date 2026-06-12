@@ -204,30 +204,31 @@ void register_sort_benchmark(std::string_view container,
                              input_pattern pattern,
                              void (*function)(benchmark::State&, input_pattern),
                              void (*args)(benchmark::Benchmark*)) {
-  auto* benchmark = benchmark::RegisterBenchmark(
-      (std::string(container) + "/" + std::string(name)).c_str(),
-      [function, pattern](benchmark::State& state) {
-        function(state, pattern);
-      });
+  auto* benchmark = benchmark::RegisterBenchmark((std::string(container) + "/" + std::string(name)).c_str(),
+                                                 [function, pattern](benchmark::State& state) {
+                                                   function(state, pattern);
+                                                 });
   args(benchmark);
 }
 
 template <class Container>
 void register_container_sorts(std::string_view container) {
   for (const auto [suffix, pattern] : {std::pair{"reverse", input_pattern::reverse},
-                                      std::pair{"randomish", input_pattern::randomish},
-                                      std::pair{"few_unique", input_pattern::few_unique},
-                                      std::pair{"all_equal", input_pattern::all_equal},
-                                      std::pair{"sorted", input_pattern::sorted},
-                                      std::pair{"organ_pipe", input_pattern::organ_pipe}}) {
-    register_sort_benchmark<Container>(container, std::string("std_sort/") + suffix, pattern, &bench_std_sort<Container>, large_sort_args);
+                                       std::pair{"randomish", input_pattern::randomish},
+                                       std::pair{"few_unique", input_pattern::few_unique},
+                                       std::pair{"all_equal", input_pattern::all_equal},
+                                       std::pair{"sorted", input_pattern::sorted},
+                                       std::pair{"organ_pipe", input_pattern::organ_pipe}}) {
+    register_sort_benchmark<Container>(
+        container, std::string("std_sort/") + suffix, pattern, &bench_std_sort<Container>, large_sort_args);
     register_sort_benchmark<Container>(
         container, std::string("chaistl_sort/") + suffix, pattern, &bench_chaistl_sort<Container>, large_sort_args);
     register_sort_benchmark<Container>(
         container, std::string("pdqsort/") + suffix, pattern, &bench_pdqsort<Container>, large_sort_args);
     register_sort_benchmark<Container>(
         container, std::string("quick_sort/") + suffix, pattern, &bench_quick_sort<Container>, large_sort_args);
-    register_sort_benchmark<Container>(container, std::string("qsort/") + suffix, pattern, &bench_qsort<Container>, large_sort_args);
+    register_sort_benchmark<Container>(
+        container, std::string("qsort/") + suffix, pattern, &bench_qsort<Container>, large_sort_args);
     register_sort_benchmark<Container>(
         container, std::string("intro_sort/") + suffix, pattern, &bench_intro_sort<Container>, large_sort_args);
     register_sort_benchmark<Container>(
