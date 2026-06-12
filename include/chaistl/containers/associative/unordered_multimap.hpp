@@ -458,9 +458,9 @@ constexpr typename unordered_multimap<Key, T, Hash, KeyEqual, Allocator, RehashP
 }
 
 template <class Key, class T, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
-constexpr void swap(unordered_multimap<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
-                    unordered_multimap<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(
-    noexcept(lhs.swap(rhs))) {
+constexpr void swap(
+    unordered_multimap<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+    unordered_multimap<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

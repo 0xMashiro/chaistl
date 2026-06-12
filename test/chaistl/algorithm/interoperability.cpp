@@ -92,9 +92,10 @@ TEST(StandardAlgorithmInteropTest, HashContainersSupportForwardTraversalAlgorith
   chaistl::unordered_set<int> values{1, 2, 3, 4};
 
   EXPECT_NE(std::ranges::find(values, 3), values.end());
-  EXPECT_EQ(std::ranges::count_if(values, [](int value) {
-              return value % 2 == 0;
-            }),
+  EXPECT_EQ(std::ranges::count_if(values,
+                                  [](int value) {
+                                    return value % 2 == 0;
+                                  }),
             2);
 }
 

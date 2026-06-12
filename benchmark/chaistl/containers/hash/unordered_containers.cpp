@@ -11,10 +11,10 @@
 // - Rehash benchmarks compare reserve-then-insert against normal growth so the
 //   cost of avoiding incremental rehashes is visible at the same key scale.
 
-#include <chaistl/containers/unordered_map.hpp>
-#include <chaistl/containers/unordered_set.hpp>
 #include <chaistl/containers/power2_unordered_map.hpp>
 #include <chaistl/containers/power2_unordered_set.hpp>
+#include <chaistl/containers/unordered_map.hpp>
+#include <chaistl/containers/unordered_set.hpp>
 
 #include <algorithm>
 #include <benchmark/benchmark.h>

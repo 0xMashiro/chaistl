@@ -341,10 +341,7 @@ class unordered_multiset {
   table_type table_;
 };
 
-template <class Key,
-          class Hash = std::hash<Key>,
-          class KeyEqual = std::equal_to<Key>,
-          class Allocator = allocator<Key>>
+template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = allocator<Key>>
 using power2_unordered_multiset =
     unordered_multiset<Key, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
 
@@ -436,9 +433,9 @@ constexpr typename unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPoli
 }
 
 template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
-constexpr void swap(unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
-                    unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(
-    noexcept(lhs.swap(rhs))) {
+constexpr void swap(
+    unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+    unordered_multiset<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

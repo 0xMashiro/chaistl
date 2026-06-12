@@ -21,7 +21,11 @@
 
 namespace chaistl {
 
-template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy = detail::hash::prime_rehash_policy>
+template <class Key,
+          class Hash,
+          class KeyEqual,
+          class Allocator,
+          class RehashPolicy = detail::hash::prime_rehash_policy>
   requires concepts::container_element<Key> && concepts::allocator_for<Allocator, Key> &&
            detail::hash::hasher_for<Hash, Key> && std::predicate<const KeyEqual&, const Key&, const Key&>
 class unordered_multiset;
@@ -532,12 +536,8 @@ class unordered_set {
   table_type table_;
 };
 
-template <class Key,
-          class Hash = std::hash<Key>,
-          class KeyEqual = std::equal_to<Key>,
-          class Allocator = allocator<Key>>
-using power2_unordered_set =
-    unordered_set<Key, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
+template <class Key, class Hash = std::hash<Key>, class KeyEqual = std::equal_to<Key>, class Allocator = allocator<Key>>
+using power2_unordered_set = unordered_set<Key, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
 
 // ============================================================================
 // Deduction guides ([unord.set.overview]).
@@ -629,8 +629,9 @@ constexpr typename unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>::
 }
 
 template <class Key, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
-constexpr void swap(unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
-                    unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
+constexpr void swap(
+    unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+    unordered_set<Key, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

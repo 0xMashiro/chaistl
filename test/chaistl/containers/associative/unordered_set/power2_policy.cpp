@@ -113,9 +113,10 @@ TEST(UnorderedSetPower2Policy, MapMergeWorksAcrossPrimeAndPower2Policies) {
 
   prime.merge(power2);
 
-  EXPECT_THAT(prime, UnorderedElementsAre(std::pair<const int, int>{1, 10},
-                                          std::pair<const int, int>{2, 20},
-                                          std::pair<const int, int>{3, 30}));
+  EXPECT_THAT(
+      prime,
+      UnorderedElementsAre(
+          std::pair<const int, int>{1, 10}, std::pair<const int, int>{2, 20}, std::pair<const int, int>{3, 30}));
   EXPECT_THAT(power2, UnorderedElementsAre(std::pair<const int, int>{2, 200}));
   EXPECT_TRUE(prime.validate());
   EXPECT_TRUE(power2.validate());

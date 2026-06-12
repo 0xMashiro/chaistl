@@ -673,8 +673,7 @@ template <class Key,
           class Hash = std::hash<Key>,
           class KeyEqual = std::equal_to<Key>,
           class Allocator = allocator<std::pair<const Key, T>>>
-using power2_unordered_map =
-    unordered_map<Key, T, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
+using power2_unordered_map = unordered_map<Key, T, Hash, KeyEqual, Allocator, detail::hash::power2_rehash_policy>;
 
 // ============================================================================
 // Deduction guides ([unord.map.overview]).
@@ -790,9 +789,9 @@ constexpr typename unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy
 }
 
 template <class Key, class T, class Hash, class KeyEqual, class Allocator, class RehashPolicy>
-constexpr void swap(unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
-                    unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(
-    noexcept(lhs.swap(rhs))) {
+constexpr void swap(
+    unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& lhs,
+    unordered_map<Key, T, Hash, KeyEqual, Allocator, RehashPolicy>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
   lhs.swap(rhs);
 }
 

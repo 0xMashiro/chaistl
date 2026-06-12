@@ -596,8 +596,7 @@ class hash_table {
    * @pre Equal allocators (the standard's splicing precondition).
    */
   template <class Hash2, class KeyEqual2, class RehashPolicy2>
-  constexpr void merge_unique(
-      hash_table<Key, Value, KeyOfValue, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
+  constexpr void merge_unique(hash_table<Key, Value, KeyOfValue, Hash2, KeyEqual2, Allocator, RehashPolicy2>& source) {
     CHAI_HARDENED(node_allocator_ == source.node_allocator_, "hash_table::merge_unique: allocator mismatch");
     hash_node_base* node = source.order_head_;
     while (node != nullptr) {
@@ -1135,7 +1134,7 @@ class hash_table {
   }
 
   [[nodiscard]] constexpr hash_node_base* last_equivalent_in_order(hash_node_base* first,
-                                                                    const key_type& key) const noexcept {
+                                                                   const key_type& key) const noexcept {
     hash_node_base* last = first;
     while (last->next_in_order != nullptr &&
            key_equal_(key_of_value_(static_cast<table_node_type*>(last->next_in_order)->value), key)) {
@@ -1145,8 +1144,8 @@ class hash_table {
   }
 
   [[nodiscard]] constexpr hash_node_base* last_equivalent_in_bucket(hash_node_base* first,
-                                                                     std::size_t code,
-                                                                     const key_type& key) const noexcept {
+                                                                    std::size_t code,
+                                                                    const key_type& key) const noexcept {
     hash_node_base* last = first;
     while (last->next_in_bucket != nullptr && last->next_in_bucket->cached_hash == code &&
            key_equal_(key_of_value_(static_cast<table_node_type*>(last->next_in_bucket)->value), key)) {

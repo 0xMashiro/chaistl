@@ -75,9 +75,7 @@ struct TrackingAllocator {
 struct DirectionalCompare {
   bool descending = false;
 
-  constexpr bool operator()(int lhs, int rhs) const noexcept {
-    return descending ? lhs > rhs : lhs < rhs;
-  }
+  constexpr bool operator()(int lhs, int rhs) const noexcept { return descending ? lhs > rhs : lhs < rhs; }
 };
 
 struct ThrowingMoveCompare {

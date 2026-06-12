@@ -105,8 +105,8 @@ struct binary_heap_policy {
   // ancestors down while they are smaller than `value` (never above `top`),
   // then drop `value` into the hole where the walk stopped.
   template <class T, class Compare>
-  static constexpr void drop_in_from(std::span<T> heap, std::size_t index, std::size_t top, T value,
-                                     const Compare& cmp) {
+  static constexpr void drop_in_from(
+      std::span<T> heap, std::size_t index, std::size_t top, T value, const Compare& cmp) {
     while (index > top && cmp(heap[parent(index)], value)) {
       heap[index] = std::move(heap[parent(index)]);
       index = parent(index);

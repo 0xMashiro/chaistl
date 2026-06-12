@@ -154,8 +154,8 @@ class skip_list_multiset {
     insert(other.begin(), other.end());
   }
 
-  constexpr skip_list_multiset(skip_list_multiset&& other) noexcept(std::is_nothrow_move_constructible_v<Compare> &&
-                                                                    std::is_nothrow_move_constructible_v<node_allocator>)
+  constexpr skip_list_multiset(skip_list_multiset&& other) noexcept(
+      std::is_nothrow_move_constructible_v<Compare> && std::is_nothrow_move_constructible_v<node_allocator>)
       : compare_(std::move(other.compare_)),
         alloc_(std::move(other.alloc_)),
         head_(std::move(other.head_)),

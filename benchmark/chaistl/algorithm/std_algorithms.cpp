@@ -373,35 +373,37 @@ void register_algorithm_output_benchmarks(std::string_view container_name) {
 
 template <class Container>
 void register_algorithm_sort_benchmark(std::string_view container_name) {
-  register_algorithm_benchmark<Container>(container_name, "ranges_sort", &bench_ranges_sort<Container>,
-                                          apply_mutating_algorithm_args);
-  register_algorithm_benchmark<Container>(container_name, "ranges_stable_sort", &bench_ranges_stable_sort<Container>,
-                                          apply_mutating_algorithm_args);
-  register_algorithm_benchmark<Container>(container_name, "ranges_nth_element", &bench_ranges_nth_element<Container>,
-                                          apply_mutating_algorithm_args);
-  register_algorithm_benchmark<Container>(container_name, "ranges_make_heap_sort_heap",
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_sort", &bench_ranges_sort<Container>, apply_mutating_algorithm_args);
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_stable_sort", &bench_ranges_stable_sort<Container>, apply_mutating_algorithm_args);
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_nth_element", &bench_ranges_nth_element<Container>, apply_mutating_algorithm_args);
+  register_algorithm_benchmark<Container>(container_name,
+                                          "ranges_make_heap_sort_heap",
                                           &bench_ranges_make_heap_sort_heap<Container>,
                                           apply_mutating_algorithm_args);
 }
 
 template <class Container>
 void register_algorithm_reverse_benchmark(std::string_view container_name) {
-  register_algorithm_benchmark<Container>(container_name, "ranges_reverse", &bench_ranges_reverse<Container>,
-                                          apply_mutating_algorithm_args);
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_reverse", &bench_ranges_reverse<Container>, apply_mutating_algorithm_args);
 }
 
 template <class Container>
 void register_algorithm_forward_permutation_benchmarks(std::string_view container_name) {
-  register_algorithm_benchmark<Container>(container_name, "ranges_rotate", &bench_ranges_rotate<Container>,
-                                          apply_mutating_algorithm_args);
-  register_algorithm_benchmark<Container>(container_name, "ranges_partition", &bench_ranges_partition<Container>,
-                                          apply_mutating_algorithm_args);
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_rotate", &bench_ranges_rotate<Container>, apply_mutating_algorithm_args);
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_partition", &bench_ranges_partition<Container>, apply_mutating_algorithm_args);
 }
 
 template <class Container>
 void register_algorithm_lower_bound_benchmark(std::string_view container_name) {
   register_algorithm_benchmark<Container>(container_name, "ranges_lower_bound", &bench_ranges_lower_bound<Container>);
-  register_algorithm_benchmark<Container>(container_name, "ranges_binary_search", &bench_ranges_binary_search<Container>);
+  register_algorithm_benchmark<Container>(
+      container_name, "ranges_binary_search", &bench_ranges_binary_search<Container>);
   register_algorithm_benchmark<Container>(container_name, "ranges_equal_range", &bench_ranges_equal_range<Container>);
 }
 

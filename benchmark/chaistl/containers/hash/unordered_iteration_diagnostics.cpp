@@ -55,8 +55,8 @@ auto make_keys(std::size_t count, key_order order) -> std::vector<key_type> {
 }
 
 auto make_miss_keys(std::size_t count, miss_probe probe) -> std::vector<key_type> {
-  const key_type first = probe == miss_probe::near_range ? static_cast<key_type>(count)
-                                                         : static_cast<key_type>(count * 16);
+  const key_type first =
+      probe == miss_probe::near_range ? static_cast<key_type>(count) : static_cast<key_type>(count * 16);
   std::vector<key_type> keys(count);
   std::iota(keys.begin(), keys.end(), first);
   std::mt19937 rng(1234u);
@@ -195,38 +195,35 @@ void apply_iteration_diagnostic_args(benchmark::Benchmark* benchmark) {
 
 template <class Set, key_order Order, reserve_policy Reserve>
 void register_iteration_diagnostic(std::string_view container_name, std::string_view operation) {
-  auto* benchmark = benchmark::RegisterBenchmark(
-      (std::string(container_name) + "/" + std::string(operation)).c_str(),
-      &bench_iterate_sum_with_policy<Set, Order, Reserve>);
+  auto* benchmark = benchmark::RegisterBenchmark((std::string(container_name) + "/" + std::string(operation)).c_str(),
+                                                 &bench_iterate_sum_with_policy<Set, Order, Reserve>);
   apply_iteration_diagnostic_args(benchmark);
 }
 
 template <class Set, reserve_policy Reserve, miss_probe Probe>
 void register_lookup_miss_diagnostic(std::string_view container_name, std::string_view operation) {
-  auto* benchmark = benchmark::RegisterBenchmark(
-      (std::string(container_name) + "/" + std::string(operation)).c_str(),
-      &bench_lookup_miss_with_policy<Set, Reserve, Probe>);
+  auto* benchmark = benchmark::RegisterBenchmark((std::string(container_name) + "/" + std::string(operation)).c_str(),
+                                                 &bench_lookup_miss_with_policy<Set, Reserve, Probe>);
   apply_iteration_diagnostic_args(benchmark);
 }
 
 template <class Set, reserve_policy Reserve, miss_bucket Bucket>
 void register_lookup_miss_bucket_diagnostic(std::string_view container_name, std::string_view operation) {
-  auto* benchmark = benchmark::RegisterBenchmark(
-      (std::string(container_name) + "/" + std::string(operation)).c_str(),
-      &bench_lookup_miss_bucket_class<Set, Reserve, Bucket>);
+  auto* benchmark = benchmark::RegisterBenchmark((std::string(container_name) + "/" + std::string(operation)).c_str(),
+                                                 &bench_lookup_miss_bucket_class<Set, Reserve, Bucket>);
   apply_iteration_diagnostic_args(benchmark);
 }
 
 template <class Set>
 void register_iteration_diagnostics_for(std::string_view container_name) {
-  register_iteration_diagnostic<Set, key_order::sequential, reserve_policy::natural_growth>(
-      container_name, "iterate_sum_seq_natural");
-  register_iteration_diagnostic<Set, key_order::sequential, reserve_policy::reserve_first>(
-      container_name, "iterate_sum_seq_reserved");
-  register_iteration_diagnostic<Set, key_order::random, reserve_policy::natural_growth>(
-      container_name, "iterate_sum_random_natural");
-  register_iteration_diagnostic<Set, key_order::random, reserve_policy::reserve_first>(
-      container_name, "iterate_sum_random_reserved");
+  register_iteration_diagnostic<Set, key_order::sequential, reserve_policy::natural_growth>(container_name,
+                                                                                            "iterate_sum_seq_natural");
+  register_iteration_diagnostic<Set, key_order::sequential, reserve_policy::reserve_first>(container_name,
+                                                                                           "iterate_sum_seq_reserved");
+  register_iteration_diagnostic<Set, key_order::random, reserve_policy::natural_growth>(container_name,
+                                                                                        "iterate_sum_random_natural");
+  register_iteration_diagnostic<Set, key_order::random, reserve_policy::reserve_first>(container_name,
+                                                                                       "iterate_sum_random_reserved");
   register_lookup_miss_diagnostic<Set, reserve_policy::natural_growth, miss_probe::near_range>(
       container_name, "lookup_miss_near_natural");
   register_lookup_miss_diagnostic<Set, reserve_policy::reserve_first, miss_probe::near_range>(
@@ -249,8 +246,7 @@ void register_unordered_iteration_diagnostics() {
 }
 
 CHAISTL_BENCHMARK_SMOKE_DOMAIN(
-    hash,
-    "^(std|chaistl)::unordered_set<int>/iterate_sum_(seq|random)_(natural|reserved)/4096/100$")
+    hash, "^(std|chaistl)::unordered_set<int>/iterate_sum_(seq|random)_(natural|reserved)/4096/100$")
 CHAISTL_REGISTER_BENCHMARK_FILE(register_unordered_iteration_diagnostics)
 
 }  // namespace chaistl_benchmark
