@@ -8,6 +8,68 @@ For the `std` facilities you will combine, see [toolbox.md](toolbox.md).
 
 ## Container Implementation Patterns
 
+### Internal Helper Naming
+
+Helper names should describe the semantic boundary they own, not merely the
+lines of code they contain. Do not extract a helper just because a block is
+used once; extract it when the name captures a stable container concept or
+hides a fragile invariant such as raw storage, sentinels, allocator ownership,
+or rollback state.
+
+| Scenario | Preferred verb | Boundary |
+|----------|----------------|----------|
+| Allocate raw storage only | `allocate_*` | Obtains storage; does not construct elements or change container structure |
+| Release raw storage only | `deallocate_*` | Releases storage that no longer contains live elements |
+| Create a live node/element | `create_*` | Allocates and constructs, with rollback on partial failure |
+| End a live node/element | `destroy_*` | Destroys and deallocates one live object or owned node |
+| Wire existing nodes | `link_*` | Changes pointers only; does not construct, destroy, or update `size_` |
+| Detach existing nodes | `unlink_*` | Changes pointers only; detached nodes remain live and owned by someone |
+| Public-operation insertion core | `insert_*` / `emplace_*` | May construct, link, update size, and provide exception guarantees |
+| Erase from this container | `erase_*` | Removes from the container and ends element lifetime |
+| Standard remove-style operation | `remove_*` | Reserve for value/predicate removal semantics, matching list-style APIs |
+| Take another container's storage | `take_*_from` | O(1) ownership transfer; source is left empty and valid |
+| Destroy current storage, then take | `replace_*_from` | Releases current storage before taking from another container |
+| Check whether storage can be taken | `storage_compatible_with` | Expresses the operation precondition, usually allocator equality |
+| Build a temporary object | `make_*` | Returns a new value object; does not mutate the current container |
+| Verify invariants | `verify()` / `validate()` | Full structural check for tests and teaching, not normal operation |
+
+Use `*_impl` only when several public overloads funnel into the same semantic
+operation and no more specific name exists. Prefer `insert_impl` for
+`insert(const T&)` / `insert(T&&)` sharing; avoid `impl` for named algorithms
+such as `normalize_appended_tail`, `trickle_down`, or `search_predecessors`.
+
+For `detail` algorithms modeled on standard algorithms, keep the standard
+algorithm name intact and add project-specific qualification around it. For
+example, prefer `allocator_uninitialized_copy_n` over
+`uninitialized_allocator_copy_n`: the former says "allocator-aware
+`uninitialized_copy_n`", while the latter splits the standard algorithm name.
+
+The naming contract matters:
+
+- A function named `unlink_*` must not destroy nodes or decrement `size_`.
+  If it does, name it `erase_*`, or split it into `unlink_*` plus `destroy_*`.
+- A function named `create_node` may allocate auxiliary node storage, construct
+  the value, and roll back all partial work. That is stronger and clearer than
+  `make_node` for container-owned nodes.
+- A function named `append_*` or `prepend_*` should describe container-end
+  insertion semantics. Internal pointer wiring should use `link_*`.
+- A function named `take_storage_from` must leave the source object empty and
+  destructible. If it first releases current storage, call the wrapper
+  `replace_storage_from`.
+
+The usual private-section order is:
+
+1. storage data members
+2. node/raw-storage lifecycle helpers
+3. link/unlink helpers
+4. storage ownership helpers
+5. lookup/order helpers
+6. invariant checks
+
+Small containers may collapse sections, but keep the order when several helper
+families are present. It lets readers find the invariant they need without
+learning each container from scratch.
+
 ### Constructor Categories
 
 Every sequence container needs these constructor forms:
